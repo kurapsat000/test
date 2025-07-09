@@ -9,7 +9,7 @@
         "--header-insertion=iwyu",
         "--suggest-missing-includes",
         "--log=verbose",
-        "--compile-commands-dir=build/debug"
+        "--compile-commands-dir=build/clangd"
     ],
     "clangd.checkUpdates": "background",
     "clangd.path": "clangd",
