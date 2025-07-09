@@ -1,6 +1,6 @@
 {
     "C_Cpp.default.configurationProvider": "clangd",
-    "C_Cpp.intelliSenseEngine": "disabled",
+    "C_Cpp.intelliSenseEngine": "enabled",
     "C_Cpp.intelliSenseEngineFallback": "disabled",
     "clangd.arguments": [
         "--background-index",
@@ -11,7 +11,6 @@
         "--log=verbose",
         "--compile-commands-dir=build/debug"
     ],
-    "clangd.onConfig": "restart",
     "clangd.checkUpdates": "background",
     "clangd.path": "clangd",
     "clangd.trace": "verbose",
@@ -54,5 +53,15 @@
         "-DDUCKDB_BUILD_LIBRARY",
         "-DDUCKDB_MAIN_LIBRARY",
         "-DDUCKDB_EXTENSION_QUACK_LINKED=1"
-    ]
-} 
+    ],
+    "cmake.configureOnOpen": false,
+    "cmake.configureArgs": [
+        "-DEXTENSION_STATIC_BUILD=1",
+        "-DVCPKG_BUILD=1",
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        "-DDUCKDB_EXTENSION_CONFIGS=${workspaceFolder}/extension_config.cmake",
+        "-DENABLE_UNITTEST_CPP_TESTS=FALSE"
+    ],
+    "cmake.buildDirectory": "${workspaceFolder}/build/release",
+    "cmake.sourceDirectory": "${workspaceFolder}/duckdb"
+}
