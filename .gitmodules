@@ -6,3 +6,6 @@
 	path = extension-ci-tools
 	url = https://github.com/duckdb/extension-ci-tools
 	branch = main
+[submodule "arrow-adbc"]
+	path = arrow-adbc
+	url = https://github.com/apache/arrow-adbc.git
