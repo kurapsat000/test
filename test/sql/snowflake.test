@@ -1,0 +1,33 @@
+# name: test/sql/snowflake.test
+# description: test snowflake extension
+# group: [sql]
+
+# Before we load the extension, this will fail
+statement error
+SELECT snowflake_version();
+----
+Catalog Error: Scalar Function with name snowflake_version does not exist!
+
+# Require statement will ensure this test is run with this extension loaded
+require snowflake
+
+# Confirm the extension works
+query I
+SELECT snowflake_version();
+----
+Snowflake Extension v0.1.0
+
+# Test that snowflake_scan exists and validates parameters
+statement error
+SELECT * FROM snowflake_scan('');
+----
+Binder Error: snowflake_scan requires at least 2 parameters: connection_string and query
+
+# Test invalid connection string
+statement error  
+SELECT * FROM snowflake_scan('invalid', 'SELECT 1');
+----
+Invalid Input Error: Snowflake connection string missing required 'account' parameter
+
+# More comprehensive tests would require actual Snowflake credentials
+# These would be added in a separate test file that's not committed to the repository
