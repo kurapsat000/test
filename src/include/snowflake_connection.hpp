@@ -9,7 +9,7 @@
 
 namespace duckdb {
 namespace snowflake {
-    
+
 enum class SnowflakeAuthType {
     PASSWORD,
     OAUTH,
@@ -63,7 +63,11 @@ class SnowflakeConnectionManager {
 public:
     static SnowflakeConnectionManager& GetInstance();
     
+    std::shared_ptr<SnowflakeConnection> GetConnection(const std::string& connection_string, const SnowflakeConfig& config);
+    
+    // Convenience wrapper that does not require config
     std::shared_ptr<SnowflakeConnection> GetConnection(const std::string& connection_string);
+
     void ReleaseConnection(const std::string& connection_string);
     
 private:

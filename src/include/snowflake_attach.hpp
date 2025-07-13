@@ -7,6 +7,7 @@ namespace duckdb {
 namespace snowflake {
 
 struct SnowflakeAttachData : public TableFunctionData {
+	string connection_string;
 	SnowflakeConfig config;
 };
 

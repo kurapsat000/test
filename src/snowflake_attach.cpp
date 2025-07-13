@@ -11,6 +11,7 @@ static unique_ptr<FunctionData> AttachBind(ClientContext &context, TableFunction
         auto bind_data = make_uniq<SnowflakeAttachData>();
         auto connection_string = input.inputs[0].GetValue<string>();
 
+        bind_data->connection_string = connection_string;
         bind_data->config = SnowflakeConfig::ParseConnectionString(connection_string);
 
         return_types.emplace_back(LogicalType::BOOLEAN);
@@ -26,7 +27,7 @@ static void AttachFunction(ClientContext &context, TableFunctionInput &data_p, D
     auto &attach_data = static_cast<SnowflakeAttachData&>(*data_p.bind_data);
     // TODO: connect to ADBC
     auto &manager = SnowflakeConnectionManager::GetInstance();
-    auto connection = manager.GetConnection();
+    auto connection = manager.GetConnection(attach_data->connection_string, attach_data->config);
 }
 
 SnowflakeAttachFunction::SnowflakeAttachFunction()
