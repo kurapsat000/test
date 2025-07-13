@@ -21,6 +21,8 @@ set(EXTENSION_SOURCES
     src/snowflake_connection.cpp
     src/snowflake_arrow_utils.cpp
     src/snowflake_scan.cpp
+    src/snowflake_attach.cpp
+    src/snowflake_utils.cpp
 )
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
