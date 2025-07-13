@@ -1,16 +1,13 @@
 #pragma once
 
 #include "duckdb.hpp"
+#include "snowflake_connection.hpp"
 
 namespace duckdb {
 namespace snowflake {
 
 struct SnowflakeAttachData : public TableFunctionData {
-	string account;
-	string user;
-	string password;
-	string warehouse;
-	string database;
+	SnowflakeConfig config;
 };
 
 class SnowflakeAttachFunction : public TableFunction {

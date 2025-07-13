@@ -8,7 +8,8 @@
 #include <unordered_map>
 
 namespace duckdb {
-
+namespace snowflake {
+    
 enum class SnowflakeAuthType {
     PASSWORD,
     OAUTH,
@@ -71,4 +72,5 @@ private:
     std::mutex connection_mutex;
 };
 
+} // namespace snowflake
 } // namespace duckdb

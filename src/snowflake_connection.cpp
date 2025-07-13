@@ -4,7 +4,7 @@
 #include <regex>
 
 namespace duckdb {
-
+namespace snowflake {
 SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connection_string) {
 	SnowflakeConfig config;
 
@@ -219,4 +219,5 @@ void SnowflakeConnectionManager::ReleaseConnection(const std::string &connection
 	connections.erase(connection_string);
 }
 
+} // namespace snowflake
 } // namespace duckdb
