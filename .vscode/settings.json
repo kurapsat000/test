@@ -1,8 +1,8 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}/duckdb",
-    "cmake.configureEnvironment": {
-        "VCPKG_TOOLCHAIN_PATH": "/home/prady/vcpkg/scripts/buildsystems/vcpkg.cmake"
-    },
+    "cmake.configureArgs": [
+        "-DDUCKDB_EXTENSION_CONFIGS=${workspaceFolder}/extension_config.cmake"
+    ],
     "files.associations": {
         "any": "cpp",
         "array": "cpp",

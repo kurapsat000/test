@@ -1,5 +1,6 @@
 #include "snowflake_connection.hpp"
 #include "duckdb/common/exception.hpp"
+#include "duckdb/function/table/arrow.hpp"
 #include <sstream>
 #include <regex>
 
@@ -73,6 +74,7 @@ void SnowflakeConnection::Connect(const SnowflakeConfig &config) {
 		Disconnect();
 	}
 
+	this->config = config;
 	InitializeDatabase(config);
 	InitializeConnection();
 	connected = true;
@@ -96,7 +98,7 @@ void SnowflakeConnection::InitializeDatabase(const SnowflakeConfig &config) {
 	AdbcStatusCode status = AdbcDatabaseNew(&database, &error);
 	CheckError(status, "Failed to create ADBC database");
 
-	// Use ADBC driver manager to load the Snowflake driver 
+	// Use ADBC driver manager to load the Snowflake driver
 	// Load the specific driver path at runtime using the macro from CMakeLists.txt
 	status = AdbcDatabaseSetOption(&database, "driver", SNOWFLAKE_ADBC_LIB_PATH, &error);
 	CheckError(status, "Failed to set Snowflake driver path");
@@ -192,12 +194,83 @@ void SnowflakeConnection::CheckError(AdbcStatusCode status, const std::string &o
 	}
 }
 
+vector<string> SnowflakeConnection::ListTables(ClientContext &context) {
+	const string schema_query = "SELECT table_name FROM " + config.database +
+	                            ".information_schema.tables WHERE table_schema = '" + config.schema + "'";
+
+	if (!connected) {
+		throw IOException("Connection must be created before ListTables is called");
+	}
+
+	AdbcStatement statement;
+	AdbcStatusCode result = AdbcStatementNew(GetConnection(), &statement, &error);
+	CheckError(result, string("Failed to create AdbcStatement") + error.message);
+
+	CheckError(AdbcStatementSetSqlQuery(&statement, schema_query.c_str(), &error),
+	           "Failed to set AdbcStatement with SQL query: " + schema_query);
+
+	ArrowArrayStream stream = {};
+	int64_t rows_affected = -1;
+	CheckError(AdbcStatementExecuteQuery(&statement, &stream, &rows_affected, &error),
+	           "Failed to execute AdbcStatement with SQL query: " + schema_query);
+
+	ArrowSchema schema = {};
+	stream.get_schema(&stream, &schema);
+
+	if (schema.n_children != 1) {
+		throw IOException("Expected table with 1 child, got " + schema.n_children);
+	}
+
+	if (strcmp(schema.children[0]->name, "table_name") != 0) {
+		throw IOException(string("Expected table with column with name \"table_name\", got ") + schema.children[0]->name);
+	}
+
+	schema.release(&schema);
+
+	vector<string> table_names;
+	DataChunk output_chunk;
+	output_chunk.Initialize(Allocator::DefaultAllocator(), {LogicalType::VARCHAR});
+	arrow_column_map_t conversion_map;
+	conversion_map[0] = make_shared_ptr<ArrowType>(LogicalType::VARCHAR);
+
+	while (true) {
+		ArrowArray chunk;
+		int return_code = stream.get_next(&stream, &chunk);
+
+		if (return_code != 0) {
+			throw IOException("ArrowArrayStream returned error code: " + return_code);
+		}
+
+		if (chunk.release == nullptr) {
+			break;
+		}
+
+		auto chunk_wrapper = make_uniq<ArrowArrayWrapper>();
+		chunk_wrapper->arrow_array = chunk;
+		ArrowScanLocalState local_state(std::move(chunk_wrapper), context);
+
+		ArrowTableFunction::ArrowToDuckDB(local_state, conversion_map, output_chunk, 0);
+
+		auto &names_vector = output_chunk.data[0];
+		for (idx_t vector_idx = 0; vector_idx < output_chunk.size(); vector_idx++) {
+			auto val = names_vector.GetValue(vector_idx);
+			table_names.push_back(val.ToString());
+		}
+	}
+
+	stream.release(&stream);
+	CheckError(AdbcStatementRelease(&statement, &error), "Failed to release AdbcStatement");
+
+	return table_names;
+}
+
 SnowflakeConnectionManager &SnowflakeConnectionManager::GetInstance() {
 	static SnowflakeConnectionManager instance;
 	return instance;
 }
 
-std::shared_ptr<SnowflakeConnection> GetConnection(const std::string& connection_string, const SnowflakeConfig& config) {
+std::shared_ptr<SnowflakeConnection> SnowflakeConnectionManager::GetConnection(const std::string &connection_string,
+                                                   const SnowflakeConfig &config) {
 	std::lock_guard<std::mutex> lock(connection_mutex);
 
 	auto it = connections.find(connection_string);

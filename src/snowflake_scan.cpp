@@ -10,7 +10,7 @@
 #include <arrow-adbc/adbc.h>
 
 namespace duckdb {
-
+namespace snowflake {
 struct SnowflakeScanBindData : public TableFunctionData {
 	std::string connection_string;
 	std::string query;
@@ -248,4 +248,5 @@ TableFunction GetSnowflakeScanFunction() {
 	return snowflake_scan;
 }
 
+} // namespace snowflake
 } // namespace duckdb
