@@ -13,17 +13,17 @@ static unique_ptr<FunctionData> AttachBind(ClientContext &context, TableFunction
 		bind_data->connection_string = connection_string;
 		bind_data->config = SnowflakeConfig::ParseConnectionString(connection_string);
 
-		return_types.emplace_back(LogicalType::BOOLEAN);
+		return_types.emplace_back(LogicalType(LogicalTypeId::BOOLEAN));
 		names.emplace_back("Success");
 
-		return move(bind_data);
+		return std::move(bind_data);
 	} catch (const std::exception &e) {
 		throw BinderException("Failed to attach Snowflake Database: %s", e.what());
 	}
 }
 
 static void AttachFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
-	auto &attach_data = (SnowflakeAttachData &)(*data_p.bind_data);
+	const auto &attach_data = dynamic_cast<const SnowflakeAttachData &>(*data_p.bind_data);
 
 	auto &manager = SnowflakeConnectionManager::GetInstance();
 	auto connection = manager.GetConnection(attach_data.connection_string, attach_data.config);
@@ -46,7 +46,7 @@ static void AttachFunction(ClientContext &context, TableFunctionInput &data_p, D
 }
 
 SnowflakeAttachFunction::SnowflakeAttachFunction()
-    : TableFunction("snowflake_attach", {LogicalType::VARCHAR}, AttachFunction, AttachBind) {
+    : TableFunction("snowflake_attach", {LogicalType(LogicalTypeId::VARCHAR)}, AttachFunction, AttachBind) {
 }
 
 } // namespace snowflake

@@ -237,16 +237,20 @@ static unique_ptr<NodeStatistics> SnowflakeScanCardinality(ClientContext &contex
 	return nullptr;
 }
 
-TableFunction GetSnowflakeScanFunction() {
-	TableFunction snowflake_scan("snowflake_scan", {LogicalType::VARCHAR, LogicalType::VARCHAR}, SnowflakeScanExecute,
-	                             SnowflakeScanBind, SnowflakeScanInitGlobal, SnowflakeScanInitLocal);
+} // namespace snowflake
 
-	snowflake_scan.cardinality = SnowflakeScanCardinality;
+TableFunction GetSnowflakeScanFunction() {
+	TableFunction snowflake_scan("snowflake_scan", {LogicalType(LogicalTypeId::VARCHAR), LogicalType(LogicalTypeId::VARCHAR)}, 
+	                             snowflake::SnowflakeScanExecute,
+	                             snowflake::SnowflakeScanBind, 
+	                             snowflake::SnowflakeScanInitGlobal, 
+	                             snowflake::SnowflakeScanInitLocal);
+
+	snowflake_scan.cardinality = snowflake::SnowflakeScanCardinality;
 	snowflake_scan.projection_pushdown = false; // TODO: Implement in Phase 3
 	snowflake_scan.filter_pushdown = false;     // TODO: Implement in Phase 3
 
 	return snowflake_scan;
 }
 
-} // namespace snowflake
 } // namespace duckdb
