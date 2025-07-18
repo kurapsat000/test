@@ -5,7 +5,7 @@
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "duckdb/function/table/arrow.hpp"
 #include "duckdb/function/table/arrow/arrow_duck_schema.hpp"
-#include "snowflake_connection.hpp"
+#include "snowflake_client_manager.hpp"
 #include "snowflake_arrow_utils.hpp"
 #include <arrow-adbc/adbc.h>
 
@@ -16,7 +16,7 @@ struct SnowflakeScanBindData : public TableFunctionData {
 	std::string query;
 	vector<string> column_names;
 	vector<LogicalType> column_types;
-	std::shared_ptr<SnowflakeConnection> connection;
+	std::shared_ptr<SnowflakeClient> connection;
 	arrow_column_map_t arrow_convert_data;
 	ArrowSchemaWrapper schema_wrapper;
 
@@ -69,7 +69,7 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 
 	// Parse connection and establish connection to get schema
 	try {
-		bind_data->connection = SnowflakeConnectionManager::GetInstance().GetConnection(bind_data->connection_string);
+		bind_data->connection = SnowflakeClient::GetInstance().GetConnection(bind_data->connection_string);
 
 		// Prepare statement to get schema
 		AdbcStatement statement;

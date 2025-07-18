@@ -1,7 +1,7 @@
 #pragma once
 
 #include "duckdb.hpp"
-#include "snowflake_connection.hpp"
+#include "snowflake_client_manager.hpp"
 #include "duckdb/function/table_function.hpp"
 
 namespace duckdb {

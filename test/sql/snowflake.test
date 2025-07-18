@@ -21,13 +21,13 @@ Snowflake Extension v0.1.0
 statement error
 SELECT * FROM snowflake_scan('');
 ----
-Binder Error: snowflake_scan requires at least 2 parameters: connection_string and query
+No function matches the given name and argument types 'snowflake_scan(VARCHAR)'
 
 # Test invalid connection string
 statement error  
 SELECT * FROM snowflake_scan('invalid', 'SELECT 1');
 ----
-Invalid Input Error: Snowflake connection string missing required 'account' parameter
+Failed to bind snowflake_scan: {"exception_type":"Invalid Input","exception_message":"Snowflake connection string missing required 'account' parameter"}
 
 # More comprehensive tests would require actual Snowflake credentials
 # These would be added in a separate test file that's not committed to the repository

@@ -8,6 +8,7 @@ namespace snowflake {
 static unique_ptr<Catalog> SnowflakeAttach(StorageExtensionInfo *storage_info, ClientContext &context,
                                         AttachedDatabase &db, const string &name, AttachInfo &info,
                                         AccessMode access_mode) {
+    // TODO rewrite to create and return snowflake catalog
     Connection duckdb_connection(db.GetDatabase());
 
     auto safe_path = StringUtil::Replace(info.path, "'", "''");

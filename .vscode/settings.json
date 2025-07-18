@@ -1,7 +1,8 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}/duckdb",
     "cmake.configureArgs": [
-        "-DDUCKDB_EXTENSION_CONFIGS=${workspaceFolder}/extension_config.cmake"
+        "-DDUCKDB_EXTENSION_CONFIGS=${workspaceFolder}/extension_config.cmake",
+        "-DCMAKE_TOOLCHAIN_FILE=/home/prady/vcpkg/scripts/buildsystems/vcpkg.cmake"
     ],
     "files.associations": {
         "any": "cpp",

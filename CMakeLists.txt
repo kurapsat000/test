@@ -18,11 +18,14 @@ include_directories(src/include)
 
 set(EXTENSION_SOURCES
     src/snowflake_extension.cpp
-    src/snowflake_connection.cpp
+    src/snowflake_client.cpp
+    src/snowflake_client_manager.cpp
+    src/snowflake_config.cpp
     src/snowflake_arrow_utils.cpp
     src/snowflake_scan.cpp
     src/snowflake_attach.cpp
     src/snowflake_storage.cpp
+    # src/snowflake_catalog.cpp
 )
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})

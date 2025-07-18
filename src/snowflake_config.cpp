@@ -1,0 +1,62 @@
+#include "snowflake_config.hpp"
+#include <sstream>
+#include <regex>
+
+namespace duckdb {
+namespace snowflake {
+
+SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connection_string) {
+	SnowflakeConfig config;
+
+	// Parse key=value pairs separated by semicolons
+	std::regex param_regex("([^=;]+)=([^;]*)");
+	auto params_begin = std::sregex_iterator(connection_string.begin(), connection_string.end(), param_regex);
+	auto params_end = std::sregex_iterator();
+
+	for (auto it = params_begin; it != params_end; ++it) {
+		std::string key = (*it)[1].str();
+		std::string value = (*it)[2].str();
+
+		if (key == "account") {
+			config.account = value;
+		} else if (key == "username" || key == "user") {
+			config.username = value;
+		} else if (key == "password") {
+			config.password = value;
+		} else if (key == "warehouse") {
+			config.warehouse = value;
+		} else if (key == "database") {
+			config.database = value;
+		} else if (key == "schema") {
+			config.schema = value;
+		} else if (key == "role") {
+			config.role = value;
+		} else if (key == "auth_type") {
+			if (value == "password") {
+				config.auth_type = SnowflakeAuthType::PASSWORD;
+			} else if (value == "oauth") {
+				config.auth_type = SnowflakeAuthType::OAUTH;
+			} else if (value == "key_pair") {
+				config.auth_type = SnowflakeAuthType::KEY_PAIR;
+			}
+		} else if (key == "token") {
+			config.oauth_token = value;
+		} else if (key == "private_key") {
+			config.private_key = value;
+		} else if (key == "query_timeout") {
+			config.query_timeout = std::stoi(value);
+		} else if (key == "keep_alive") {
+			config.keep_alive = (value == "true" || value == "1");
+		}
+	}
+
+	// Validate required fields
+	if (config.account.empty()) {
+		throw InvalidInputException("Snowflake connection string missing required 'account' parameter");
+	}
+
+	return config;
+}
+
+} // namespace snowflake
+} // namespace duckdb
