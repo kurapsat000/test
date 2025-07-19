@@ -30,7 +30,7 @@ public:
 		return &database;
 	}
 
-	vector<string> ListSchemas();
+	vector<string> ListSchemas(ClientContext &context);
 	vector<string> ListTables(ClientContext &context);
 	vector<SnowflakeColumn> GetTableInfo(const string &schema, const string &table);
 

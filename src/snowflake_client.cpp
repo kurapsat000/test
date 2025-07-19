@@ -29,7 +29,7 @@ void SnowflakeClient::Disconnect() {
 	if (!connected) {
 		return;
 	}
-	
+
 	AdbcError error;
 	AdbcStatusCode status;
 
@@ -144,9 +144,39 @@ void SnowflakeClient::CheckError(const AdbcStatusCode status, const std::string 
 	throw IOException(error_message);
 }
 
-vector<string> ListSchemas() {
+vector<string> SnowflakeClient::ListSchemas(ClientContext &context) {
 	const string schema_query = "SHOW SCHEMAS";
-	const vector<string> expected_names = {"created_on", "name", "is_default", "is_current", "database_name", "options", "comment" };
+	// TODO these column names might be wrong, have to check during testing
+	const vector<string> expected_names = {"created_on",
+	                                       "name",
+	                                       "is_default",
+	                                       "is_current",
+	                                       "database_name",
+	                                       "owner",
+	                                       "comment",
+	                                       "options",
+	                                       "retention_time",
+	                                       "owner_role_type",
+	                                       "classification_profile_database",
+	                                       "classification_profile_schema",
+	                                       "classification_profile",
+	                                       "object_visibility"};
+	// TODO verify these types are correct
+	const vector<LogicalType> expected_types = {LogicalType::TIMESTAMP_TZ, LogicalType::VARCHAR, LogicalType::VARCHAR,
+	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR, LogicalType::VARCHAR,
+	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR, LogicalType::VARCHAR,
+	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR, LogicalType::VARCHAR,
+	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR};
+
+	auto chunk = ExecuteAndGetChunk(context, schema_query, expected_names, expected_types);
+
+	vector<string> schema_names;
+
+	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
+		schema_names.push_back(chunk->GetValue(1, chunk_idx).ToString());
+	}
+
+	return schema_names;
 }
 
 vector<string> SnowflakeClient::ListTables(ClientContext &context) {
@@ -158,7 +188,7 @@ vector<string> SnowflakeClient::ListTables(ClientContext &context) {
 	auto chunk = ExecuteAndGetChunk(context, table_name_query, expected_names, expected_types);
 
 	vector<string> table_names;
-	
+
 	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
 		table_names.push_back(chunk->GetValue(0, chunk_idx).ToString());
 	}
@@ -166,13 +196,26 @@ vector<string> SnowflakeClient::ListTables(ClientContext &context) {
 	return table_names;
 }
 
-vector<SnowflakeColumn> GetTableInfo(const string &schema, const string &table) {
+vector<SnowflakeColumn> SnowflakeClient::GetTableInfo(const string &schema, const string &table) {
+	const string table_info_query = "SELECT table_name FROM " + config.database +
+	                                ".information_schema.tables WHERE table_schema = '" + config.schema + "'";
+	const vector<string> expected_names = {"table_name"};
+	const vector<LogicalType> expected_types = {LogicalType::VARCHAR};
 
+	auto chunk = ExecuteAndGetChunk(context, table_info_query, expected_names, expected_types);
+
+	vector<string> table_names;
+
+	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
+		table_names.push_back(chunk->GetValue(0, chunk_idx).ToString());
+	}
+
+	return table_names;
 }
 
 unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context, const string &query,
-                                                              const vector<string> &expected_names,
-                                                              const vector<LogicalType> &expected_types) {
+                                                          const vector<string> &expected_names,
+                                                          const vector<LogicalType> &expected_types) {
 	if (!connected) {
 		throw IOException("Connection must be created before ListTables is called");
 	}
