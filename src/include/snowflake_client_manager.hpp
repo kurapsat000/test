@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <mutex>
 
 namespace duckdb {
 namespace snowflake {

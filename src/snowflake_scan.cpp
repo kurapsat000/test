@@ -7,6 +7,7 @@
 #include "duckdb/function/table/arrow/arrow_duck_schema.hpp"
 #include "snowflake_client_manager.hpp"
 #include "snowflake_arrow_utils.hpp"
+#include "snowflake_config.hpp"
 #include <arrow-adbc/adbc.h>
 
 namespace duckdb {
@@ -69,7 +70,9 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 
 	// Parse connection and establish connection to get schema
 	try {
-		bind_data->connection = SnowflakeClient::GetInstance().GetConnection(bind_data->connection_string);
+		auto &client_manager = SnowflakeClientManager::GetInstance();
+		auto config = SnowflakeConfig::ParseConnectionString(bind_data->connection_string);
+		bind_data->connection = client_manager.GetConnection(bind_data->connection_string, config);
 
 		// Prepare statement to get schema
 		AdbcStatement statement;

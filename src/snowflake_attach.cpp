@@ -25,7 +25,7 @@ static unique_ptr<FunctionData> AttachBind(ClientContext &context, TableFunction
 static void AttachFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
 	const auto &attach_data = dynamic_cast<const SnowflakeAttachData &>(*data_p.bind_data);
 
-	auto &manager = SnowflakeClient::GetInstance();
+	auto &manager = SnowflakeClientManager::GetInstance();
 	auto connection = manager.GetConnection(attach_data.connection_string, attach_data.config);
 
 	auto table_names = connection->ListTables(context);

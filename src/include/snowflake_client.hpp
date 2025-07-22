@@ -32,7 +32,7 @@ public:
 
 	vector<string> ListSchemas(ClientContext &context);
 	vector<string> ListTables(ClientContext &context);
-	vector<SnowflakeColumn> GetTableInfo(const string &schema, const string &table);
+	vector<SnowflakeColumn> GetTableInfo(ClientContext &context, const string &schema, const string &table);
 
 	private:
 	SnowflakeConfig config;

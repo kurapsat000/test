@@ -1,4 +1,6 @@
 #include "snowflake_config.hpp"
+#include "duckdb/common/exception.hpp"
+
 #include <sstream>
 #include <regex>
 

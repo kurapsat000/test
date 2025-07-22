@@ -196,7 +196,7 @@ vector<string> SnowflakeClient::ListTables(ClientContext &context) {
 	return table_names;
 }
 
-vector<SnowflakeColumn> SnowflakeClient::GetTableInfo(const string &schema, const string &table) {
+vector<SnowflakeColumn> SnowflakeClient::GetTableInfo(ClientContext &context, const string &schema, const string &table) {
 	const string table_info_query = "SELECT table_name FROM " + config.database +
 	                                ".information_schema.tables WHERE table_schema = '" + config.schema + "'";
 	const vector<string> expected_names = {"table_name"};
@@ -204,13 +204,13 @@ vector<SnowflakeColumn> SnowflakeClient::GetTableInfo(const string &schema, cons
 
 	auto chunk = ExecuteAndGetChunk(context, table_info_query, expected_names, expected_types);
 
-	vector<string> table_names;
+	vector<SnowflakeColumn> col_data;
 
 	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
-		table_names.push_back(chunk->GetValue(0, chunk_idx).ToString());
+		// table_names.push_back(chunk->GetValue(0, chunk_idx).ToString());
 	}
 
-	return table_names;
+	return col_data;
 }
 
 unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context, const string &query,
