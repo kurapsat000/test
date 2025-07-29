@@ -1,4 +1,3 @@
-
 {
     "configurations": [
         {
@@ -11,8 +10,6 @@
             "configurationProvider": "ms-vscode.cmake-tools",
             "includePath": [
                 "${workspaceFolder}/src",
-                "${workspaceFolder}/include",
-                "${workspaceFolder}/duckdb/include",
                 "${workspaceFolder}/duckdb/src/include",
                 "${workspaceFolder}/duckdb/extension",
                 "${workspaceFolder}/scripts"

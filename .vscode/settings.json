@@ -1,19 +1,5 @@
 {
-  "C_Cpp.default.configurationProvider": "clangd",
-  "C_Cpp.intelliSenseEngine": "enabled",
-  "C_Cpp.intelliSenseEngineFallback": "disabled",
-  "clangd.arguments": [
-    "--background-index",
-    "--completion-style=detailed",
-    "--fallback-style=Google",
-    "--header-insertion=iwyu",
-    "--suggest-missing-includes",
-    "--log=verbose",
-    "--compile-commands-dir=build/clangd"
-  ],
-  "clangd.checkUpdates": "background",
-  "clangd.path": "clangd",
-  "clangd.trace": "verbose",
+  "C_Cpp.intelliSenseEngine": "default",
   "files.associations": {
     "*.h": "c",
     "*.hpp": "cpp",
@@ -28,7 +14,6 @@
     "source.organizeImports": "explicit"
   },
   "C_Cpp.errorSquiggles": "enabled",
-  "C_Cpp.warningSquiggles": "enabled",
   "editor.quickSuggestions": {
     "other": true,
     "comments": false,
@@ -47,13 +32,6 @@
   "editor.gotoLocation.multipleImplementations": "goto",
   "editor.gotoLocation.multipleReferences": "goto",
   "editor.gotoLocation.multipleTypeDefinitions": "goto",
-  "clangd.fallbackFlags": [
-    "-std=c++11",
-    "-DDUCKDB",
-    "-DDUCKDB_BUILD_LIBRARY",
-    "-DDUCKDB_MAIN_LIBRARY",
-    "-DDUCKDB_EXTENSION_QUACK_LINKED=1"
-  ],
   "cmake.configureOnOpen": false,
   "cmake.configureArgs": [
     "-DEXTENSION_STATIC_BUILD=1",
