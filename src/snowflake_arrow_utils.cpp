@@ -3,22 +3,64 @@
 
 namespace duckdb {
 
-	// ArrowStreamWrapper implementation
-	ArrowStreamWrapper::ArrowStreamWrapper() {
-		std::memset(&stream, 0, sizeof(stream));
-	}
+	// Wrapper to handle ADBC ArrowArrayStream
+	// This class takes ownership of an ADBC stream and makes it compatible with DuckDB's ArrowArrayStreamWrapper
+	class SnowflakeArrowArrayStreamWrapper : public ArrowArrayStreamWrapper {
+	public:
+		SnowflakeArrowArrayStreamWrapper() : ArrowArrayStreamWrapper() {}
 
-	ArrowStreamWrapper::~ArrowStreamWrapper() {
-		if (initialized && stream.release) {
-			stream.release(&stream);
+		void InitializeFromADBC(struct ArrowArrayStream* stream) {
+			// Directly copy the ADBC stream structure to our base class member
+			// This provides zero-copy access to the Arrow data from Snowflake
+			arrow_array_stream = *stream;
+			// Clear the source to prevent double-release
+			// The wrapper now owns the stream and will handle cleanup
+			std::memset(stream, 0, sizeof(*stream));
 		}
-	}
+	};
 
-	void ArrowStreamWrapper::InitializeFromADBC(AdbcStatement* statement) {
+	// This function is called by DuckDB's arrow_scan to produce an ArrowArrayStreamWrapper
+	// It's called once per scan to create the stream that will provide data chunks
+	unique_ptr<ArrowArrayStreamWrapper> SnowflakeProduceArrowScan(uintptr_t factory_ptr, ArrowStreamParameters& parameters) {
+		auto factory = reinterpret_cast<SnowflakeArrowStreamFactory*>(factory_ptr);
+
+		// Initialize ADBC statement if not already done
+		// We defer this to the produce function to avoid executing the query during bind
+		if (!factory->statement_initialized) {
+			AdbcError error;
+			std::memset(&error, 0, sizeof(error));
+
+			// Create a new ADBC statement from the connection
+			AdbcStatusCode status = AdbcStatementNew(factory->connection->GetConnection(), &factory->statement, &error);
+			if (status != ADBC_STATUS_OK) {
+				throw IOException("Failed to create statement");
+			}
+			factory->statement_initialized = true;
+
+			// Set the SQL query on the statement
+			status = AdbcStatementSetSqlQuery(&factory->statement, factory->query.c_str(), &error);
+			if (status != ADBC_STATUS_OK) {
+				std::string error_msg = "Failed to set query: ";
+				if (error.message) {
+					error_msg += error.message;
+					if (error.release) {
+						error.release(&error);
+					}
+				}
+				throw IOException(error_msg);
+			}
+		}
+
+		// Execute the query and get the ArrowArrayStream
+		// This is where the actual query execution happens
+		auto wrapper = make_uniq<SnowflakeArrowArrayStreamWrapper>();
+		struct ArrowArrayStream adbc_stream;
+		int64_t rows_affected;
 		AdbcError error;
 		std::memset(&error, 0, sizeof(error));
 
-		AdbcStatusCode status = AdbcStatementExecuteQuery(statement, &stream, nullptr, &error);
+		// ExecuteQuery returns an ArrowArrayStream that provides Arrow record batches
+		AdbcStatusCode status = AdbcStatementExecuteQuery(&factory->statement, &adbc_stream, &rows_affected, &error);
 		if (status != ADBC_STATUS_OK) {
 			std::string error_msg = "Failed to execute query: ";
 			if (error.message) {
@@ -30,45 +72,61 @@ namespace duckdb {
 			throw IOException(error_msg);
 		}
 
-		// Import the stream to Arrow C++ API
-		auto result = arrow::ImportRecordBatchReader(&stream);
-		if (!result.ok()) {
-			throw IOException("Failed to import Arrow stream: " + result.status().ToString());
-		}
+		// Transfer ownership of the ADBC stream to our wrapper
+		// This ensures zero-copy data transfer from Snowflake to DuckDB
+		wrapper->InitializeFromADBC(&adbc_stream);
+		wrapper->number_of_rows = rows_affected;
 
-		reader = *result;
-		schema = reader->schema();
-		initialized = true;
+		return std::move(wrapper);
 	}
 
-	bool ArrowStreamWrapper::GetNextBatch(std::shared_ptr<arrow::RecordBatch>& batch) {
-		if (!initialized || !reader) {
-			return false;
+	// This function is called by DuckDB's arrow_scan during bind to get the schema
+	// It allows DuckDB to know the column types before actually executing the query
+	void SnowflakeGetArrowSchema(ArrowArrayStream* factory_ptr, ArrowSchema& schema) {
+		auto factory = reinterpret_cast<SnowflakeArrowStreamFactory*>(factory_ptr);
+
+		// Initialize statement if not already done
+		if (!factory->statement_initialized) {
+			AdbcError error;
+			std::memset(&error, 0, sizeof(error));
+
+			AdbcStatusCode status = AdbcStatementNew(factory->connection->GetConnection(), &factory->statement, &error);
+			if (status != ADBC_STATUS_OK) {
+				throw IOException("Failed to create statement");
+			}
+			factory->statement_initialized = true;
+
+			// Set the query
+			status = AdbcStatementSetSqlQuery(&factory->statement, factory->query.c_str(), &error);
+			if (status != ADBC_STATUS_OK) {
+				std::string error_msg = "Failed to set query: ";
+				if (error.message) {
+					error_msg += error.message;
+					if (error.release) {
+						error.release(&error);
+					}
+				}
+				throw IOException(error_msg);
+			}
 		}
 
-		auto result = reader->Next();
-		if (!result.ok()) {
-			throw IOException("Failed to read next batch: " + result.status().ToString());
+		// Execute with schema only - this is a lightweight operation that just returns
+		// the schema without actually executing the full query
+		AdbcError schema_error;
+		std::memset(&schema_error, 0, sizeof(schema_error));
+		std::memset(&schema, 0, sizeof(schema));
+
+		AdbcStatusCode schema_status = AdbcStatementExecuteSchema(&factory->statement, &schema, &schema_error);
+		if (schema_status != ADBC_STATUS_OK) {
+			std::string error_msg = "Failed to get schema: ";
+			if (schema_error.message) {
+				error_msg += schema_error.message;
+				if (schema_error.release) {
+					schema_error.release(&schema_error);
+				}
+			}
+			throw IOException(error_msg);
 		}
-
-		batch = *result;
-		return batch != nullptr;
-	}
-
-	unique_ptr<ArrowArrayWrapper> ArrowStreamWrapper::GetNextChunk() {
-		std::shared_ptr<arrow::RecordBatch> batch;
-		if (!GetNextBatch(batch) || !batch) {
-			return nullptr;
-		}
-
-		// Convert arrow::RecordBatch to ArrowArrayWrapper
-		auto chunk = make_uniq<ArrowArrayWrapper>();
-		auto status = arrow::ExportRecordBatch(*batch, &chunk->arrow_array);
-		if (!status.ok()) {
-			throw IOException("Failed to export record batch: " + status.ToString());
-		}
-
-		return chunk;
 	}
 
 } // namespace duckdb

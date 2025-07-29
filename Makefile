@@ -15,6 +15,7 @@ build-adbc-release:
 	cmake --build build --config Release && \
 	mkdir -p ../../build/release && \
 	find build -name "*.so" -exec cp {} ../../build/release/ \;
+	$(MAKE) copy-adbc-to-extension BUILD_TYPE=release
 
 build-adbc-debug:
 	mkdir -p ./arrow-adbc/c/build-debug && \
@@ -23,6 +24,18 @@ build-adbc-debug:
 	cmake --build build-debug --config Debug && \
 	mkdir -p ../../build/debug && \
 	find build-debug -name "*.so" -exec cp {} ../../build/debug/ \;
+	$(MAKE) copy-adbc-to-extension BUILD_TYPE=debug
+
+# Common step to copy ADBC driver to extension directory for RUNPATH ($ORIGIN) resolution
+copy-adbc-to-extension:
+	@echo "Copying ADBC driver to extension directory for $(BUILD_TYPE) build..."
+	@mkdir -p build/$(BUILD_TYPE)/extension/snowflake
+	@if [ -f build/$(BUILD_TYPE)/libadbc_driver_snowflake.so ]; then \
+		cp build/$(BUILD_TYPE)/libadbc_driver_snowflake.so build/$(BUILD_TYPE)/extension/snowflake/; \
+		echo "ADBC driver copied to extension directory"; \
+	else \
+		echo "Warning: ADBC driver not found in build/$(BUILD_TYPE)/"; \
+	fi
 
 # Override the standard targets to include ADBC build
 release: build-adbc-release ${EXTENSION_CONFIG_STEP}

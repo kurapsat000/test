@@ -1,3 +1,5 @@
+#pragma once
+
 #include "snowflake_client.hpp"
 #include "snowflake_config.hpp"
 

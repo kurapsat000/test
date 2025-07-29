@@ -50,6 +50,41 @@ target_link_libraries(${LOADABLE_EXTENSION_NAME}
     AdbcDriverManager::adbc_driver_manager_static
 )
 
+# RPATH configuration for loading shared libraries from the same directory
+# Set RPATH policies
+if(POLICY CMP0042)
+    cmake_policy(SET CMP0042 NEW) # MACOSX_RPATH is enabled by default
+endif()
+if(POLICY CMP0068)
+    cmake_policy(SET CMP0068 NEW) # RPATH settings are used for build tree
+endif()
+
+# Enable RPATH
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# Platform-specific RPATH configuration
+if(APPLE)
+    set_target_properties(${LOADABLE_EXTENSION_NAME} PROPERTIES
+        BUILD_RPATH "@loader_path"
+        INSTALL_RPATH "@loader_path"
+        MACOSX_RPATH TRUE
+    )
+else()
+    set_target_properties(${LOADABLE_EXTENSION_NAME} PROPERTIES
+        BUILD_RPATH "$ORIGIN"
+        INSTALL_RPATH "$ORIGIN"
+    )
+endif()
+
+# Ensure RPATH is not stripped
+set_target_properties(${LOADABLE_EXTENSION_NAME} PROPERTIES
+    SKIP_BUILD_RPATH FALSE
+    BUILD_WITH_INSTALL_RPATH FALSE
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+)
+
 # Define path to Snowflake ADBC shared library for dynamic loading
 target_compile_definitions(${EXTENSION_NAME} PRIVATE 
     -DSNOWFLAKE_ADBC_LIB_PATH="${SNOWFLAKE_ADBC_LIB}"
