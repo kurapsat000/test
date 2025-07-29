@@ -24,6 +24,7 @@ set(EXTENSION_SOURCES
     src/snowflake_scan.cpp
     src/snowflake_attach.cpp
     src/snowflake_storage.cpp
+    src/snowflake_types.cpp
     # src/snowflake_catalog.cpp
 )
 

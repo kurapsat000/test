@@ -7,44 +7,44 @@
 #include <arrow-adbc/adbc_driver_manager.h>
 
 namespace duckdb {
-namespace snowflake {
+	namespace snowflake {
+		struct SnowflakeColumn {
+			string name;
+			LogicalType type;
+			bool is_nullable;
+		};
 
-struct SnowflakeColumn {
-	string name;
-	string type; // The raw Snowflake type, e.g., "NUMBER(38,0)"
-};
+		class SnowflakeClient {
+		public:
+			SnowflakeClient();
+			~SnowflakeClient();
 
-class SnowflakeClient {
-public:
-	SnowflakeClient();
-	~SnowflakeClient();
+			void Connect(const SnowflakeConfig& config);
+			void Disconnect();
+			bool IsConnected() const;
 
-	void Connect(const SnowflakeConfig &config);
-	void Disconnect();
-	bool IsConnected() const;
+			AdbcConnection* GetConnection() {
+				return &connection;
+			}
+			AdbcDatabase* GetDatabase() {
+				return &database;
+			}
 
-	AdbcConnection *GetConnection() {
-		return &connection;
-	}
-	AdbcDatabase *GetDatabase() {
-		return &database;
-	}
+			vector<string> ListSchemas(ClientContext& context);
+			vector<string> ListTables(ClientContext& context);
+			vector<SnowflakeColumn> GetTableInfo(ClientContext& context, const string& schema, const string& table_name);
 
-	vector<string> ListSchemas(ClientContext &context);
-	vector<string> ListTables(ClientContext &context);
-	vector<SnowflakeColumn> GetTableInfo(ClientContext &context, const string &schema, const string &table);
+		private:
+			SnowflakeConfig config;
+			AdbcDatabase database;
+			AdbcConnection connection;
+			bool connected = false;
 
-	private:
-	SnowflakeConfig config;
-	AdbcDatabase database;
-	AdbcConnection connection;
-	bool connected = false;
-	
-	unique_ptr<DataChunk> ExecuteAndGetChunk(ClientContext &context, const string &query, const vector<string> &expected_names, const vector<LogicalType> &expected_types);
-	void InitializeDatabase(const SnowflakeConfig &config);
-	void InitializeConnection();
-	void CheckError(const AdbcStatusCode status, const std::string &operation, AdbcError *error);
-};
+			unique_ptr<DataChunk> ExecuteAndGetChunk(ClientContext& context, const string& query, const vector<string>& expected_names, const vector<LogicalType>& expected_types);
+			void InitializeDatabase(const SnowflakeConfig& config);
+			void InitializeConnection();
+			void CheckError(const AdbcStatusCode status, const std::string& operation, AdbcError* error);
+		};
 
-} // namespace snowflake
+	} // namespace snowflake
 } // namespace duckdb
