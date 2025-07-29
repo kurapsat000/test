@@ -7,13 +7,37 @@ EXT_CONFIG=${PROJ_DIR}extension_config.cmake
 # Include the Makefile from extension-ci-tools
 include extension-ci-tools/makefiles/duckdb_extension.Makefile
 
-# IntelliSense targets for development
-intellisense: ${EXTENSION_CONFIG_STEP}
-	mkdir -p ./build/clangd && \
-	cmake  -DEXTENSION_STATIC_BUILD=1 -DVCPKG_BUILD=1 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DDUCKDB_EXTENSION_CONFIGS='${PROJ_DIR}/extension_config.cmake' -DENABLE_UNITTEST_CPP_TESTS=FALSE   -DCMAKE_BUILD_TYPE=Release -S "./duckdb/" -B build/release && \
-	cp ./build/release/compile_commands.json ./build/clangd/ && \
-	echo "IntelliSense setup complete! compile_commands.json copied to build/clangd/"
+# Arrow ADBC build integration
+build-adbc-release:
+	mkdir -p ./arrow-adbc/c/build && \
+	cd ./arrow-adbc/c && \
+	cmake . -DADBC_DRIVER_SNOWFLAKE=ON -DCMAKE_BUILD_TYPE=Release -B build && \
+	cmake --build build --config Release && \
+	mkdir -p ../../build/release && \
+	find build -name "*.so" -exec cp {} ../../build/release/ \;
 
+build-adbc-debug:
+	mkdir -p ./arrow-adbc/c/build-debug && \
+	cd ./arrow-adbc/c && \
+	cmake . -DADBC_DRIVER_SNOWFLAKE=ON -DCMAKE_BUILD_TYPE=Debug -B build-debug && \
+	cmake --build build-debug --config Debug && \
+	mkdir -p ../../build/debug && \
+	find build-debug -name "*.so" -exec cp {} ../../build/debug/ \;
 
-clangd: ${EXTENSION_CONFIG_STEP}
-	cmake -DCMAKE_BUILD_TYPE=Debug -DEXTENSION_CONFIG_BUILD=TRUE -DVCPKG_BUILD=1 -B build/clangd .
+# Override the standard targets to include ADBC build
+release: build-adbc-release ${EXTENSION_CONFIG_STEP}
+	mkdir -p build/release
+	cmake $(GENERATOR) $(BUILD_FLAGS) $(EXT_RELEASE_FLAGS) $(VCPKG_MANIFEST_FLAGS) -DCMAKE_BUILD_TYPE=Release -S $(DUCKDB_SRCDIR) -B build/release
+	cmake --build build/release --config Release
+
+debug: build-adbc-debug ${EXTENSION_CONFIG_STEP}
+	mkdir -p build/debug
+	cmake $(GENERATOR) $(BUILD_FLAGS) $(EXT_DEBUG_FLAGS) $(VCPKG_MANIFEST_FLAGS) -DCMAKE_BUILD_TYPE=Debug -S $(DUCKDB_SRCDIR) -B build/debug
+	cmake --build build/debug --config Debug
+
+# Override clean to include ADBC cleanup
+clean:
+	rm -rf build
+	rm -rf testext
+	rm -rf ./arrow-adbc/c/build ./arrow-adbc/c/build-debug
+	make clean -C $(DUCKDB_SRCDIR)
