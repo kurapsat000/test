@@ -1,0 +1,23 @@
+
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "compileCommands": "${workspaceFolder}/build/release/compile_commands.json",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "configurationProvider": "ms-vscode.cmake-tools",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/duckdb/include",
+                "${workspaceFolder}/duckdb/src/include",
+                "${workspaceFolder}/duckdb/extension",
+                "${workspaceFolder}/scripts"
+            ]
+        }
+    ],
+    "version": 4
+}
