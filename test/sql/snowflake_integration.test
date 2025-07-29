@@ -15,8 +15,8 @@ SELECT COUNT(*) FROM (VALUES (1), (2), (3), (4), (5)) t(x);
 
 # Test that would work with real Snowflake credentials (commented out for CI)
 query I  
-SELECT COUNT(*) FROM snowflake_scan(
-    'account=mwrrtqm-oa15050;user=vchikkam;password=SnowDuckDB2025!;warehouse=COMPUTE_WH;database=SNOWFLAKE_SAMPLE_DATA',
+SELECT * FROM snowflake_scan(
+    'account=ipojhsp-tpb06889;user=ptandra;password=uDxtepGYVe6f8UN;warehouse=COMPUTE_WH;database=SNOWFLAKE_SAMPLE_DATA',
     'SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER ORDER BY C_CUSTKEY LIMIT 5'
 );
 ----

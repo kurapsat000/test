@@ -2,63 +2,53 @@
 
 #include "duckdb.hpp"
 #include "duckdb/common/arrow/arrow_wrapper.hpp"
-#include <arrow/api.h>
-#include <arrow/c/bridge.h>
+#include "duckdb/function/table/arrow.hpp"
 #include <arrow-adbc/adbc.h>
+#include "snowflake_client_manager.hpp"
 
 namespace duckdb {
 
-class SnowflakeArrowUtils {
-public:
-    // No longer needed - DuckDB's ArrowTableFunction::PopulateArrowTableType handles type conversion
-    // static LogicalType ArrowTypeToDuckDB(const arrow::DataType& arrow_type);
+// Factory structure to hold ADBC connection and query information
+// This factory pattern allows us to integrate with DuckDB's arrow_scan table function
+// which expects a factory that can produce ArrowArrayStreamWrapper instances
+struct SnowflakeArrowStreamFactory {
+    // Snowflake connection managed by the client manager
+    std::shared_ptr<snowflake::SnowflakeClient> connection;
     
-    // No longer needed - using DuckDB's native ArrowTableFunction::ArrowToDuckDB
-    /*
-    static void ConvertArrowArrayToDuckDB(const arrow::Array& array, 
-                                         Vector& vector, 
-                                         idx_t offset,
-                                         idx_t size);
+    // SQL query to execute
+    std::string query;
     
-    static void ConvertArrowChunkToDuckDB(const arrow::RecordBatch& batch,
-                                         DataChunk& chunk,
-                                         idx_t start_row = 0);
-    */
+    // ADBC statement handle - initialized lazily when first needed
+    AdbcStatement statement;
+    bool statement_initialized = false;
     
-    // No longer needed - DuckDB's ArrowTableFunction::PopulateArrowTableType handles type conversion
-    // static vector<LogicalType> GetDuckDBTypes(const arrow::Schema& schema);
+    SnowflakeArrowStreamFactory(std::shared_ptr<snowflake::SnowflakeClient> conn, const std::string &query_str) 
+        : connection(conn), query(query_str) {
+        std::memset(&statement, 0, sizeof(statement));
+    }
     
-private:
-    // No longer needed - using DuckDB's native ArrowTableFunction::ArrowToDuckDB
-    /*
-    template<typename T>
-    static void ConvertNumericArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    
-    static void ConvertStringArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    static void ConvertBoolArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    static void ConvertDateArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    static void ConvertTimestampArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    static void ConvertListArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    static void ConvertStructArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    static void ConvertDecimalArray(const arrow::Array& array, Vector& vector, idx_t offset, idx_t size);
-    */
+    ~SnowflakeArrowStreamFactory() {
+        // Clean up the ADBC statement if it was initialized
+        if (statement_initialized) {
+            AdbcError error;
+            AdbcStatementRelease(&statement, &error);
+        }
+    }
 };
 
-class ArrowStreamWrapper {
-public:
-    ArrowStreamWrapper();
-    ~ArrowStreamWrapper();
-    
-    void InitializeFromADBC(AdbcStatement* statement);
-    bool GetNextBatch(std::shared_ptr<arrow::RecordBatch>& batch);
-    unique_ptr<ArrowArrayWrapper> GetNextChunk();
-    std::shared_ptr<arrow::Schema> GetSchema() const { return schema; }
-    
-private:
-    struct ArrowArrayStream stream;
-    std::shared_ptr<arrow::RecordBatchReader> reader;
-    std::shared_ptr<arrow::Schema> schema;
-    bool initialized = false;
-};
+// Function to produce an ArrowArrayStreamWrapper from the factory
+// This is called by DuckDB's arrow_scan when it needs to start scanning data
+// Parameters:
+//   factory_ptr: Pointer to our SnowflakeArrowStreamFactory cast to uintptr_t
+//   parameters: Arrow stream parameters (projection, filters, etc.) - currently unused
+// Returns: An ArrowArrayStreamWrapper that provides Arrow data chunks
+unique_ptr<ArrowArrayStreamWrapper> SnowflakeProduceArrowScan(uintptr_t factory_ptr, ArrowStreamParameters &parameters);
+
+// Function to get the schema from the factory
+// This is called by DuckDB's arrow_scan during bind to determine column types
+// Parameters:
+//   factory_ptr: Pointer to our SnowflakeArrowStreamFactory cast to ArrowArrayStream*
+//   schema: Output parameter that will be filled with the Arrow schema
+void SnowflakeGetArrowSchema(ArrowArrayStream *factory_ptr, ArrowSchema &schema);
 
 } // namespace duckdb
