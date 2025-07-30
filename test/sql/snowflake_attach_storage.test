@@ -32,7 +32,7 @@ Runtime Error: Failed to connect to Snowflake
 
 # Test 5: ATTACH with all parameters
 statement error
-ATTACH 'account=test;user=test;password=test;warehouse=test;database=testdb;schema=public;role=testrole' AS sf_db (TYPE snowflake);
+ATTACH 'account=test;user=test;password=test;warehouse=test;database=testdb;role=testrole' AS sf_db (TYPE snowflake);
 ----
 Runtime Error: Failed to connect to Snowflake
 

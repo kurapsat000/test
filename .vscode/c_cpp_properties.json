@@ -10,9 +10,13 @@
             "configurationProvider": "ms-vscode.cmake-tools",
             "includePath": [
                 "${workspaceFolder}/src",
+                "${workspaceFolder}/src/include",
                 "${workspaceFolder}/duckdb/src/include",
                 "${workspaceFolder}/duckdb/extension",
-                "${workspaceFolder}/scripts"
+                "${workspaceFolder}/scripts",
+                "${workspaceFolder}/build/release/vcpkg_installed/x64-linux/include",
+                "${workspaceFolder}/build/debug/vcpkg_installed/x64-linux/include",
+                "~/vcpkg/packages/arrow-adbc_x64-linux/include"
             ]
         }
     ],
