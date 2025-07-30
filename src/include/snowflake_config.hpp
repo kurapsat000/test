@@ -12,7 +12,7 @@ struct SnowflakeConfig {
 	std::string password;
 	std::string warehouse;
 	std::string database;
-	std::string schema;
+	// std::string schema; schema should be on a case-by-case basis
 	std::string role;
 	SnowflakeAuthType auth_type = SnowflakeAuthType::PASSWORD;
 	std::string oauth_token;

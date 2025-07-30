@@ -29,9 +29,11 @@ SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connec
 			config.warehouse = value;
 		} else if (key == "database") {
 			config.database = value;
-		} else if (key == "schema") {
-			config.schema = value;
-		} else if (key == "role") {
+		}
+		// else if (key == "schema") {
+		// 	config.schema = value;
+		// }
+		else if (key == "role") {
 			config.role = value;
 		} else if (key == "auth_type") {
 			if (value == "password") {

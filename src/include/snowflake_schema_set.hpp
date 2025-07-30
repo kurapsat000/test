@@ -5,15 +5,17 @@
 #include "snowflake_client.hpp"
 
 namespace duckdb {
-	namespace snowflake {
-		class SnowflakeSchemaSet : public SnowflakeCatalogSet {
-		public:
-			SnowflakeSchemaSet::SnowflakeSchemaSet(Catalog& catalog, SnowflakeClient& client) : SnowflakeCatalogSet(catalog), client(client) {}
+namespace snowflake {
+class SnowflakeSchemaSet : public SnowflakeCatalogSet {
+public:
+	SnowflakeSchemaSet(Catalog &catalog, SnowflakeClient &client) : SnowflakeCatalogSet(catalog), client(client) {
+	}
 
-			//! Fetches all schemas from Snowflake and creates SnowflakeSchemaEntry objects for each
-			void LoadEntries(ClientContext& context) override;
-		private:
-			SnowflakeClient& client;
-		};
-	} // namespace snowflake
+	//! Fetches all schemas from Snowflake and creates SnowflakeSchemaEntry objects for each
+	void LoadEntries(ClientContext &context) override;
+
+private:
+	SnowflakeClient &client;
+};
+} // namespace snowflake
 } // namespace duckdb
