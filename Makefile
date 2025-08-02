@@ -37,20 +37,21 @@ copy-adbc-to-extension:
 		echo "Warning: ADBC driver not found in build/$(BUILD_TYPE)/"; \
 	fi
 
-# Override the standard targets to include ADBC build
-release: build-adbc-release ${EXTENSION_CONFIG_STEP}
-	mkdir -p build/release
-	cmake $(GENERATOR) $(BUILD_FLAGS) $(EXT_RELEASE_FLAGS) $(VCPKG_MANIFEST_FLAGS) -DCMAKE_BUILD_TYPE=Release -S $(DUCKDB_SRCDIR) -B build/release
-	cmake --build build/release --config Release
+# Custom targets that build ADBC before the standard targets
+release-snowflake: build-adbc-release release
 
-debug: build-adbc-debug ${EXTENSION_CONFIG_STEP}
-	mkdir -p build/debug
-	cmake $(GENERATOR) $(BUILD_FLAGS) $(EXT_DEBUG_FLAGS) $(VCPKG_MANIFEST_FLAGS) -DCMAKE_BUILD_TYPE=Debug -S $(DUCKDB_SRCDIR) -B build/debug
-	cmake --build build/debug --config Debug
+debug-snowflake: build-adbc-debug debug
 
-# Override clean to include ADBC cleanup
-clean:
-	rm -rf build
-	rm -rf testext
+# Clean ADBC artifacts
+clean-adbc:
 	rm -rf ./arrow-adbc/c/build ./arrow-adbc/c/build-debug
-	make clean -C $(DUCKDB_SRCDIR)
+
+# Extend the clean target
+clean-all: clean clean-adbc
+
+# Make the custom targets the default
+.DEFAULT_GOAL := release-snowflake
+
+# Convenience aliases
+all: release-snowflake
+test: test_release

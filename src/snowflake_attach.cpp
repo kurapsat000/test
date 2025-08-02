@@ -28,7 +28,7 @@ static void AttachFunction(ClientContext &context, TableFunctionInput &data_p, D
 	auto &manager = SnowflakeClientManager::GetInstance();
 	auto connection = manager.GetConnection(attach_data.connection_string, attach_data.config);
 
-	auto table_names = connection->ListTables(context);
+	auto table_names = connection->ListTables(context, nullptr);
 
 	auto duckdb_connection = Connection(*context.db);
 	for (const auto &name : table_names) {
@@ -41,8 +41,8 @@ static void AttachFunction(ClientContext &context, TableFunctionInput &data_p, D
 		duckdb_connection.Query(create_view_sql);
 	}
 
-    output.data[0].SetValue(0, true);
-    output.SetCardinality(1);
+	output.data[0].SetValue(0, true);
+	output.SetCardinality(1);
 }
 
 SnowflakeAttachFunction::SnowflakeAttachFunction()
