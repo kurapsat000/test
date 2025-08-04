@@ -8,11 +8,6 @@
 
 namespace duckdb {
 namespace snowflake {
-struct SnowflakeColumn {
-	string name;
-	LogicalType type;
-	bool is_nullable;
-};
 
 class SnowflakeClient {
 public:
@@ -30,9 +25,6 @@ public:
 		return &database;
 	}
 
-	vector<string> ListSchemas(ClientContext &context);
-	vector<string> ListTables(ClientContext &context, const string &schema);
-	vector<SnowflakeColumn> GetTableInfo(ClientContext &context, const string &schema, const string &table_name);
 
 private:
 	SnowflakeConfig config;
@@ -40,9 +32,6 @@ private:
 	AdbcConnection connection;
 	bool connected = false;
 
-	unique_ptr<DataChunk> ExecuteAndGetChunk(ClientContext &context, const string &query,
-	                                         const vector<string> &expected_names,
-	                                         const vector<LogicalType> &expected_types);
 	void InitializeDatabase(const SnowflakeConfig &config);
 	void InitializeConnection();
 	void CheckError(const AdbcStatusCode status, const std::string &operation, AdbcError *error);
