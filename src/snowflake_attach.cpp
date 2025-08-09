@@ -28,6 +28,7 @@ static void AttachFunction(ClientContext &context, TableFunctionInput &data_p, D
 	auto &manager = SnowflakeClientManager::GetInstance();
 	auto connection = manager.GetConnection(attach_data.connection_string, attach_data.config);
 
+	auto table_names = connection->ListTables(context, nullptr);
 	auto table_names = connection->ListAllTables(context);
 
 	auto duckdb_connection = Connection(*context.db);

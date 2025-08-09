@@ -52,6 +52,8 @@ SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connec
 			config.query_timeout = std::stoi(value);
 		} else if (key == "keep_alive") {
 			config.keep_alive = (value == "true" || value == "1");
+		} else if (key == "use_high_precision") {
+			config.use_high_precision = (value == "true" || value == "1");
 		}
 	}
 

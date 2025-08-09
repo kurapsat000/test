@@ -4,8 +4,30 @@
 #include "snowflake_client.hpp"
 #include "snowflake_types.hpp"
 
+#include <dlfcn.h>
+#include <filesystem>
+
 namespace duckdb {
 namespace snowflake {
+
+// Get the directory where the current extension is located
+static std::string GetExtensionDirectory() {
+	Dl_info info;
+	// Use a function from this library to get its path
+	if (dladdr(reinterpret_cast<void *>(&GetExtensionDirectory), &info)) {
+		std::filesystem::path extension_path(info.dli_fname);
+		std::string dir = extension_path.parent_path().string();
+
+#ifdef DEBUG
+		fprintf(stderr, "[DEBUG] GetExtensionDirectory: dli_fname = %s\n", info.dli_fname);
+		fprintf(stderr, "[DEBUG] GetExtensionDirectory: parent_path = %s\n", dir.c_str());
+#endif
+
+		return dir;
+	}
+	// Fallback to current directory
+	return ".";
+}
 
 SnowflakeClient::SnowflakeClient() {
 	std::memset(&database, 0, sizeof(database));
@@ -58,8 +80,28 @@ void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 	CheckError(status, "Failed to create ADBC database", &error);
 
 	// Use ADBC driver manager to load the Snowflake driver
-	// Load the specific driver path at runtime using the macro from CMakeLists.txt
-	status = AdbcDatabaseSetOption(&database, "driver", SNOWFLAKE_ADBC_LIB_PATH, &error);
+	// Try to load from the same directory as the extension first
+	std::string extension_dir = GetExtensionDirectory();
+	std::filesystem::path adbc_path = std::filesystem::path(extension_dir) / SNOWFLAKE_ADBC_LIB;
+
+	// Check if the library exists in the extension directory
+	std::string driver_path;
+	if (std::filesystem::exists(adbc_path)) {
+		driver_path = adbc_path.string();
+	} else {
+		// Try just the filename - let the system search for it
+		driver_path = SNOWFLAKE_ADBC_LIB;
+	}
+
+#ifdef DEBUG
+	fprintf(stderr, "[DEBUG] Snowflake ADBC Driver Loading:\n");
+	fprintf(stderr, "  Extension directory: %s\n", extension_dir.c_str());
+	fprintf(stderr, "  Looking for driver at: %s\n", adbc_path.string().c_str());
+	fprintf(stderr, "  Driver filename: %s\n", SNOWFLAKE_ADBC_LIB);
+	fprintf(stderr, "  Final driver path: %s\n", driver_path.c_str());
+#endif
+
+	status = AdbcDatabaseSetOption(&database, "driver", driver_path.c_str(), &error);
 	CheckError(status, "Failed to set Snowflake driver path", &error);
 
 	// Set connection parameters
@@ -121,6 +163,11 @@ void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 	status = AdbcDatabaseSetOption(&database, "adbc.snowflake.sql.client_session_keep_alive",
 	                               config.keep_alive ? "true" : "false", &error);
 	CheckError(status, "Failed to set keep alive", &error);
+
+	// Set high precision mode (when false, DECIMAL(p,0) converts to INT64)
+	status = AdbcDatabaseSetOption(&database, "adbc.snowflake.sql.client_option.use_high_precision",
+	                               config.use_high_precision ? "true" : "false", &error);
+	CheckError(status, "Failed to set high precision mode", &error);
 
 	// Initialize the database
 	status = AdbcDatabaseInit(&database, &error);

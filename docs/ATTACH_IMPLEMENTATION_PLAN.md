@@ -1,8 +1,8 @@
-# Detailed Plan: PostgreSQL-style ATTACH Implementation for DuckDB Snowflake Extension
+# DuckDB Snowflake Extension - ATTACH Implementation Plan
 
 ## Overview
 
-Transform the current table function-based `snowflake_attach` into a proper PostgreSQL-style `ATTACH DATABASE` implementation using DuckDB's storage extension system.
+This document outlines the current state and implementation plan for the ATTACH command in the DuckDB Snowflake extension. The goal is to enable PostgreSQL-style database attachment, allowing users to query Snowflake tables using schema-qualified names (e.g., `sf_db.schema.table`).
 
 **Target Syntax:**
 ```sql
@@ -10,6 +10,51 @@ ATTACH DATABASE 'snowflake://account=X;user=Y;password=Z;warehouse=W;database=D'
 SELECT * FROM sf_db.schema.table_name;
 DETACH DATABASE sf_db;
 ```
+
+## Current State
+
+### ✅ Completed Components
+
+1. **Client Infrastructure**
+   - `SnowflakeClient`: ADBC-based connection wrapper with methods for:
+     - `ListSchemas()` - Retrieves available schemas
+     - `ListTables()` - Lists tables in a schema
+     - `GetTableInfo()` - Gets table metadata
+   - `SnowflakeClientManager`: Singleton for connection pooling
+   - `SnowflakeConfig`: Configuration parsing and validation
+
+2. **Basic Table Function**
+   - `snowflake_attach()` table function works but creates views in main namespace
+   - `snowflake_scan()` successfully queries Snowflake data
+   - Arrow-to-DuckDB data conversion pipeline
+
+3. **Storage Extension Registration**
+   - `SnowflakeStorageExtension` registered with DuckDB
+   - Basic structure in place but implementation incomplete
+
+### 🚧 In Progress Components
+
+1. **Catalog Framework**
+   - Header files created but no implementation:
+     - `snowflake_catalog.hpp`
+     - `snowflake_catalog_set.hpp` 
+     - `snowflake_schema_entry.hpp`
+   - `SnowflakeAttach` function returns `nullptr` instead of catalog
+
+### ❌ Missing Components
+
+1. **Catalog Implementation**
+   - No virtual method implementations for `SnowflakeCatalog`
+   - Missing schema and table entry management
+   - No integration with DuckDB's catalog system
+
+2. **Transaction Manager**
+   - Required for catalog operation
+   - Can be minimal for read-only access
+
+3. **Connection String Parsing**
+   - No support for `snowflake://` URI format
+   - Need to parse ATTACH parameters
 
 ## Phase 1: Understand DuckDB Storage Extension Architecture
 
@@ -394,11 +439,57 @@ ATTACH DATABASE 'snowflake://connection_string' AS db_name;  -- Should work but 
 - No schema-qualified access support
 - Missing transaction manager
 
+### Expected Architecture Flow
+```
+ATTACH Command
+    ↓
+SnowflakeStorageExtension::Attach
+    ↓
+Parse Connection String → Create SnowflakeClient
+    ↓
+Create SnowflakeCatalog → Initialize with Client
+    ↓
+Return Catalog to DuckDB
+    ↓
+DuckDB registers sf_db.* namespace
+    ↓
+User queries sf_db.schema.table
+    ↓
+SnowflakeCatalog::GetEntry → Create Table View
+    ↓
+Execute snowflake_scan for data access
+```
+
 ### Migration Strategy
 
 1. **Keep existing table function** for backward compatibility
 2. **Implement proper storage extension** alongside existing functionality
 3. **Deprecate table function** in documentation but keep functional
 4. **Provide migration tools** and clear upgrade path
+
+## Next Steps
+
+### Immediate Actions
+1. Implement `SnowflakeCatalog::Initialize()` method
+2. Create basic `SnowflakeSchemaEntry` class
+3. Update `SnowflakeAttach` to return catalog
+
+### Follow-up Tasks
+1. Add connection string parsing
+2. Implement schema discovery
+3. Create comprehensive tests
+
+### Future Enhancements
+1. Support for views and materialized views
+2. Column statistics for query optimization
+3. Pushdown predicates to Snowflake
+4. Support for Snowflake-specific features (variants, arrays)
+
+## References
+
+- DuckDB Catalog API documentation
+- BigQuery extension implementation
+- PostgreSQL extension implementation
+- Snowflake ADBC driver documentation
 
 This plan transforms the Snowflake extension from a simple table function into a full-featured database attachment system that follows PostgreSQL conventions and integrates seamlessly with DuckDB's multi-database architecture.
