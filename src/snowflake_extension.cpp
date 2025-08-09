@@ -3,7 +3,7 @@
 
 #include "snowflake_extension.hpp"
 #include "snowflake_attach.hpp"
-#include "snowflake_storage.hpp"
+#include "storage/snowflake_storage.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"

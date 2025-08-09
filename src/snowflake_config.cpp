@@ -9,6 +9,7 @@ namespace snowflake {
 
 SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connection_string) {
 	SnowflakeConfig config;
+	config.connection_string = connection_string;
 
 	// Parse key=value pairs separated by semicolons
 	std::regex param_regex("([^=;]+)=([^;]*)");
@@ -60,6 +61,13 @@ SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connec
 	}
 
 	return config;
+}
+
+bool SnowflakeConfig::operator==(const SnowflakeConfig &other) const {
+	return (connection_string == other.connection_string && account == other.account && username == other.username &&
+	        password == other.password && warehouse == other.warehouse && database == other.database &&
+	        role == other.role && auth_type == other.auth_type && oauth_token == other.oauth_token &&
+	        private_key == other.private_key && query_timeout == other.query_timeout && keep_alive == other.keep_alive);
 }
 
 } // namespace snowflake

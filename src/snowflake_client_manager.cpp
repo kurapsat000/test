@@ -8,8 +8,8 @@ SnowflakeClientManager &SnowflakeClientManager::GetInstance() {
 	return instance;
 }
 
-std::shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std::string &connection_string,
-                                                                    const SnowflakeConfig &config) {
+shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std::string &connection_string,
+                                                                  const SnowflakeConfig &config) {
 	std::lock_guard<std::mutex> lock(connection_mutex);
 
 	auto it = connections.find(connection_string);
@@ -18,14 +18,14 @@ std::shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std
 	}
 
 	// Create new connection
-	auto connection = std::make_shared<SnowflakeClient>();
+	auto connection = make_shared_ptr<SnowflakeClient>();
 	connection->Connect(config);
 
 	connections[connection_string] = connection;
 	return connection;
 }
 
-std::shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std::string &connection_string) {
+shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std::string &connection_string) {
 	auto config = SnowflakeConfig::ParseConnectionString(connection_string);
 	return this->GetConnection(connection_string, config);
 }

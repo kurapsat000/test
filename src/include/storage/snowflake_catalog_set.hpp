@@ -5,6 +5,8 @@
 
 namespace duckdb {
 namespace snowflake {
+
+//! SnowflakeCatalogSet serves as a generic template for an interface containing a set of entries utilizing lazy loading
 class SnowflakeCatalogSet {
 public:
 	SnowflakeCatalogSet(Catalog &catalog, bool is_loaded = false) : catalog(catalog), is_loaded(is_loaded) {};

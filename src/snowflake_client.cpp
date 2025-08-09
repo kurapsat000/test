@@ -48,6 +48,10 @@ bool SnowflakeClient::IsConnected() const {
 	return connected;
 }
 
+const SnowflakeConfig &SnowflakeClient::GetConfig() const {
+	return config;
+}
+
 void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 	AdbcError error;
 	AdbcStatusCode status = AdbcDatabaseNew(&database, &error);
@@ -179,6 +183,22 @@ vector<string> SnowflakeClient::ListSchemas(ClientContext &context) {
 	}
 
 	return schema_names;
+}
+
+vector<string> SnowflakeClient::ListAllTables(ClientContext &context) {
+	const string table_name_query = "SELECT table_name FROM " + config.database + ".information_schema.tables";
+	const vector<string> expected_names = {"table_name"};
+	const vector<LogicalType> expected_types = {LogicalType::VARCHAR};
+
+	auto chunk = ExecuteAndGetChunk(context, table_name_query, expected_names, expected_types);
+
+	vector<string> table_names;
+
+	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
+		table_names.push_back(chunk->GetValue(0, chunk_idx).ToString());
+	}
+
+	return table_names;
 }
 
 vector<string> SnowflakeClient::ListTables(ClientContext &context, const string &schema) {

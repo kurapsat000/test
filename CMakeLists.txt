@@ -23,9 +23,14 @@ set(EXTENSION_SOURCES
     src/snowflake_arrow_utils.cpp
     src/snowflake_scan.cpp
     src/snowflake_attach.cpp
-    src/snowflake_storage.cpp
     src/snowflake_types.cpp
-    # src/snowflake_catalog.cpp
+    src/storage/snowflake_storage.cpp
+    src/storage/snowflake_catalog.cpp
+    src/storage/snowflake_catalog_set.cpp
+    src/storage/snowflake_schema_entry.cpp
+    src/storage/snowflake_schema_set.cpp
+    src/storage/snowflake_table_entry.cpp
+    src/storage/snowflake_table_set.cpp
 )
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})

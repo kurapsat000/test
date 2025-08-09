@@ -29,8 +29,10 @@ public:
 	AdbcDatabase *GetDatabase() {
 		return &database;
 	}
+	const SnowflakeConfig &GetConfig() const;
 
 	vector<string> ListSchemas(ClientContext &context);
+	vector<string> ListAllTables(ClientContext &config);
 	vector<string> ListTables(ClientContext &context, const string &schema);
 	vector<SnowflakeColumn> GetTableInfo(ClientContext &context, const string &schema, const string &table_name);
 

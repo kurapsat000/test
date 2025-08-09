@@ -1,4 +1,5 @@
-#include "snowflake_schema_set.hpp"
+#include "storage/snowflake_schema_set.hpp"
+#include "storage/snowflake_table_set.hpp"
 
 namespace duckdb {
 namespace snowflake {
