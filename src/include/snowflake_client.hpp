@@ -43,8 +43,10 @@ private:
 	bool connected = false;
 
 	unique_ptr<DataChunk> ExecuteAndGetChunk(ClientContext &context, const string &query,
-	                                         const vector<string> &expected_names,
-	                                         const vector<LogicalType> &expected_types);
+	                                         const vector<LogicalType> &expected_types,
+	                                         const vector<string> &expected_names = {});
+	vector<string> ExecuteAndGetStrings(ClientContext &context, const string &query,
+	                                    const string &expected_col_name = "");
 	void InitializeDatabase(const SnowflakeConfig &config);
 	void InitializeConnection();
 	void CheckError(const AdbcStatusCode status, const std::string &operation, AdbcError *error);

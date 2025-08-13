@@ -7,10 +7,12 @@ namespace snowflake {
 
 SnowflakeCatalog::SnowflakeCatalog(AttachedDatabase &db_p, const SnowflakeConfig &config)
     : Catalog(db_p), client(SnowflakeClientManager::GetInstance().GetConnection(config.connection_string, config)),
-      schemas(*this, *client) {
+      schemas(*this, client) {
+	fprintf(stderr, "[DEBUG] SnowflakeCatalog constructor called\n");
 	if (!client || !client->IsConnected()) {
 		throw ConnectionException("Failed to connect to Snowflake");
 	}
+	fprintf(stderr, "[DEBUG] SnowflakeCatalog connected successfully\n");
 }
 
 SnowflakeCatalog::~SnowflakeCatalog() {
@@ -20,10 +22,16 @@ SnowflakeCatalog::~SnowflakeCatalog() {
 }
 
 void SnowflakeCatalog::Initialize(bool load_builtin) {
+	fprintf(stderr, "[DEBUG] SnowflakeCatalog::Initialize called with load_builtin=%s\n", load_builtin ? "true" : "false");
 }
 
 void SnowflakeCatalog::ScanSchemas(ClientContext &context, std::function<void(SchemaCatalogEntry &)> callback) {
-	schemas.Scan(context, [&](CatalogEntry &schema) { callback(schema.Cast<SchemaCatalogEntry>()); });
+	fprintf(stderr, "[DEBUG] SnowflakeCatalog::ScanSchemas called\n");
+	schemas.Scan(context, [&](CatalogEntry &schema) { 
+		fprintf(stderr, "[DEBUG] ScanSchemas callback for schema: %s\n", schema.name.c_str());
+		callback(schema.Cast<SchemaCatalogEntry>()); 
+	});
+	fprintf(stderr, "[DEBUG] SnowflakeCatalog::ScanSchemas completed\n");
 }
 
 optional_ptr<SchemaCatalogEntry> SnowflakeCatalog::LookupSchema(CatalogTransaction transaction,

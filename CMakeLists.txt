@@ -22,8 +22,8 @@ set(EXTENSION_SOURCES
     src/snowflake_config.cpp
     src/snowflake_arrow_utils.cpp
     src/snowflake_scan.cpp
-    src/snowflake_attach.cpp
     src/snowflake_types.cpp
+    src/snowflake_transaction.cpp
     src/storage/snowflake_storage.cpp
     src/storage/snowflake_catalog.cpp
     src/storage/snowflake_catalog_set.cpp

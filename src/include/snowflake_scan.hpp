@@ -25,6 +25,7 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
                                                   vector<LogicalType> &return_types, vector<string> &names);
 
 } // namespace snowflake
+
 TableFunction GetSnowflakeScanFunction();
 
 } // namespace duckdb

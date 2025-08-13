@@ -2,7 +2,7 @@
 #define DUCKDB_EXTENSION_MAIN
 
 #include "snowflake_extension.hpp"
-#include "snowflake_attach.hpp"
+// #include "snowflake_attach.hpp"
 #include "storage/snowflake_storage.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
@@ -12,7 +12,6 @@
 #include "duckdb/execution/expression_executor.hpp"
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 #include "duckdb/function/table_function.hpp"
-
 
 namespace duckdb {
 
@@ -33,8 +32,8 @@ static void LoadInternal(DatabaseInstance &instance) {
 	auto snowflake_scan_function = GetSnowflakeScanFunction();
 	ExtensionUtil::RegisterFunction(instance, snowflake_scan_function);
 
-	duckdb::snowflake::SnowflakeAttachFunction snowflake_attach_function;
-	ExtensionUtil::RegisterFunction(instance, snowflake_attach_function);
+	// duckdb::snowflake::SnowflakeAttachFunction snowflake_attach_function;
+	// ExtensionUtil::RegisterFunction(instance, snowflake_attach_function);
 
 	auto &config = DBConfig::GetConfig(instance);
 	config.storage_extensions["snowflake"] = make_uniq<snowflake::SnowflakeStorageExtension>();

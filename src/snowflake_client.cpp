@@ -7,6 +7,10 @@
 #include <dlfcn.h>
 #include <filesystem>
 
+#ifndef SNOWFLAKE_ADBC_LIB
+#define SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.so"
+#endif
+
 namespace duckdb {
 namespace snowflake {
 
@@ -198,70 +202,37 @@ void SnowflakeClient::CheckError(const AdbcStatusCode status, const std::string 
 }
 
 vector<string> SnowflakeClient::ListSchemas(ClientContext &context) {
-	const string schema_query = "SHOW SCHEMAS IN DATABASE" + config.database;
-	// TODO these column names might be wrong, have to check during testing
-	const vector<string> expected_names = {"created_on",
-	                                       "name",
-	                                       "is_default",
-	                                       "is_current",
-	                                       "database_name",
-	                                       "owner",
-	                                       "comment",
-	                                       "options",
-	                                       "retention_time",
-	                                       "owner_role_type",
-	                                       "classification_profile_database",
-	                                       "classification_profile_schema",
-	                                       "classification_profile",
-	                                       "object_visibility"};
-	// TODO verify these types are correct
-	const vector<LogicalType> expected_types = {LogicalType::TIMESTAMP_TZ, LogicalType::VARCHAR, LogicalType::VARCHAR,
-	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR, LogicalType::VARCHAR,
-	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR, LogicalType::VARCHAR,
-	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR, LogicalType::VARCHAR,
-	                                            LogicalType::VARCHAR,      LogicalType::VARCHAR};
-
-	auto chunk = ExecuteAndGetChunk(context, schema_query, expected_names, expected_types);
-
-	vector<string> schema_names;
-
-	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
-		schema_names.push_back(chunk->GetValue(1, chunk_idx).ToString());
-	}
-
-	return schema_names;
+	const string schema_query = "SELECT schema_name FROM " + config.database + ".INFORMATION_SCHEMA.SCHEMATA";
+	return ExecuteAndGetStrings(context, schema_query, "schema_name");
 }
 
 vector<string> SnowflakeClient::ListAllTables(ClientContext &context) {
+	fprintf(stderr, "[DEBUG] ListAllTables called for database: %s\n", config.database.c_str());
 	const string table_name_query = "SELECT table_name FROM " + config.database + ".information_schema.tables";
-	const vector<string> expected_names = {"table_name"};
-	const vector<LogicalType> expected_types = {LogicalType::VARCHAR};
+	fprintf(stderr, "[DEBUG] Table query: %s\n", table_name_query.c_str());
 
-	auto chunk = ExecuteAndGetChunk(context, table_name_query, expected_names, expected_types);
+	auto table_names = ExecuteAndGetStrings(context, table_name_query, "table_name");
 
-	vector<string> table_names;
-
-	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
-		table_names.push_back(chunk->GetValue(0, chunk_idx).ToString());
+	fprintf(stderr, "[DEBUG] ListAllTables returning %zu tables\n", table_names.size());
+	for (const auto &table_name : table_names) {
+		fprintf(stderr, "[DEBUG] Found table: %s\n", table_name.c_str());
 	}
-
 	return table_names;
 }
 
 vector<string> SnowflakeClient::ListTables(ClientContext &context, const string &schema) {
+	fprintf(stderr, "[DEBUG] ListTables called for schema: %s in database: %s\n", schema.c_str(),
+	        config.database.c_str());
 	const string table_name_query = "SELECT table_name FROM " + config.database +
 	                                ".information_schema.tables WHERE table_schema = '" + schema + "'";
-	const vector<string> expected_names = {"table_name"};
-	const vector<LogicalType> expected_types = {LogicalType::VARCHAR};
+	fprintf(stderr, "[DEBUG] Table query: %s\n", table_name_query.c_str());
 
-	auto chunk = ExecuteAndGetChunk(context, table_name_query, expected_names, expected_types);
+	auto table_names = ExecuteAndGetStrings(context, table_name_query, "table_name");
 
-	vector<string> table_names;
-
-	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
-		table_names.push_back(chunk->GetValue(0, chunk_idx).ToString());
+	fprintf(stderr, "[DEBUG] ListTables returning %zu tables\n", table_names.size());
+	for (const auto &table_name : table_names) {
+		fprintf(stderr, "[DEBUG] Found table: %s\n", table_name.c_str());
 	}
-
 	return table_names;
 }
 
@@ -274,7 +245,7 @@ vector<SnowflakeColumn> SnowflakeClient::GetTableInfo(ClientContext &context, co
 	const vector<string> expected_names = {"COLUMN_NAME", "DATA_TYPE", "IS_NULLABLE"};
 	const vector<LogicalType> expected_types = {LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR};
 
-	auto chunk = ExecuteAndGetChunk(context, table_info_query, expected_names, expected_types);
+	auto chunk = ExecuteAndGetChunk(context, table_info_query, expected_types, expected_names);
 
 	vector<SnowflakeColumn> col_data;
 
@@ -293,8 +264,176 @@ vector<SnowflakeColumn> SnowflakeClient::GetTableInfo(ClientContext &context, co
 }
 
 unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context, const string &query,
-                                                          const vector<string> &expected_names,
-                                                          const vector<LogicalType> &expected_types) {
+                                                          const vector<LogicalType> &expected_types,
+                                                          const vector<string> &expected_names) {
+	fprintf(stderr, "[DEBUG] ExecuteAndGetChunk called with query: %s\n", query.c_str());
+	if (!connected) {
+		fprintf(stderr, "[DEBUG] ExecuteAndGetChunk: Not connected!\n");
+		throw IOException("Connection must be created before ExecuteAndGetChunk is called");
+	}
+	fprintf(stderr, "[DEBUG] ExecuteAndGetChunk: Connection is active\n");
+
+	AdbcStatement statement;
+	AdbcError error;
+	AdbcStatusCode status;
+
+	fprintf(stderr, "[DEBUG] Creating ADBC statement...\n");
+	status = AdbcStatementNew(GetConnection(), &statement, &error);
+	CheckError(status, "Failed to create AdbcStatement", &error);
+	fprintf(stderr, "[DEBUG] ADBC statement created successfully\n");
+
+	fprintf(stderr, "[DEBUG] Setting SQL query on statement...\n");
+	status = AdbcStatementSetSqlQuery(&statement, query.c_str(), &error);
+	CheckError(status, "Failed to set AdbcStatement with SQL query: " + query, &error);
+	fprintf(stderr, "[DEBUG] SQL query set successfully\n");
+
+	ArrowArrayStream stream = {};
+	int64_t rows_affected = -1;
+
+	fprintf(stderr, "[DEBUG] Executing SQL query...\n");
+	status = AdbcStatementExecuteQuery(&statement, &stream, &rows_affected, &error);
+	CheckError(status, "Failed to execute AdbcStatement with SQL query: " + query, &error);
+	fprintf(stderr, "[DEBUG] SQL query executed successfully, rows_affected: %ld\n", rows_affected);
+
+	fprintf(stderr, "[DEBUG] Getting Arrow schema...\n");
+	ArrowSchema schema = {};
+	int schema_result = stream.get_schema(&stream, &schema);
+	fprintf(stderr, "[DEBUG] Arrow schema obtained, result: %d\n", schema_result);
+
+	if (schema.release == nullptr) {
+		fprintf(stderr, "[ERROR] Arrow schema is NULL!\n");
+		throw IOException("Failed to get Arrow schema from stream");
+	}
+
+	if (static_cast<size_t>(schema.n_children) != expected_types.size()) {
+		throw IOException("Schema has " + std::to_string(schema.n_children) + " columns but expected " +
+		                  std::to_string(expected_types.size()));
+	}
+
+	for (size_t name_idx = 0; name_idx < expected_names.size(); name_idx++) {
+		if (!schema.children[name_idx]->name) {
+			throw IOException("Column at position " + std::to_string(name_idx) + " has null name");
+		}
+
+		if (!StringUtil::CIEquals(schema.children[name_idx]->name, expected_names[name_idx])) {
+			throw IOException("Expected column '" + expected_names[name_idx] + "' at position " +
+			                  std::to_string(name_idx) + " but got '" + schema.children[name_idx]->name + "'");
+		}
+	}
+
+	fprintf(stderr, "[DEBUG] Arrow schema: format=%s, n_children=%ld\n", schema.format ? schema.format : "NULL",
+	        schema.n_children);
+	for (int64_t i = 0; i < schema.n_children && i < (int64_t)expected_types.size(); i++) {
+		fprintf(stderr, "[DEBUG] Arrow column %ld: format='%s', name='%s'\n", i,
+		        schema.children[i]->format ? schema.children[i]->format : "NULL",
+		        schema.children[i]->name ? schema.children[i]->name : "NULL");
+	}
+
+	vector<unique_ptr<DataChunk>> collected_chunks;
+
+	fprintf(stderr, "[DEBUG] Building conversion map for %zu columns...\n", expected_types.size());
+	arrow_column_map_t conversion_map;
+	for (idx_t map_idx = 0; map_idx < expected_types.size(); map_idx++) {
+		const auto &type = expected_types[map_idx];
+		fprintf(stderr, "[DEBUG] Column %zu: type %s\n", map_idx, expected_types[map_idx].ToString().c_str());
+		unique_ptr<ArrowTypeInfo> type_info;
+
+		switch (type.id()) {
+		case LogicalTypeId::VARCHAR:
+		case LogicalTypeId::BLOB:
+			type_info = make_uniq<ArrowStringInfo>(ArrowVariableSizeType::NORMAL);
+			break;
+		case LogicalTypeId::LIST:
+			// TODO may need to implement ArrowListInfo (may need child info)
+			break;
+		case LogicalTypeId::STRUCT:
+			// TODO may need to implement ArrowStructInfo
+			break;
+		case LogicalTypeId::DECIMAL:
+			fprintf(stderr, "[DEBUG] MUST DECIMAL TIME TYPE INFO");
+			// TODO may need to implement ArrowDecimalInfo
+			// extract precision and scale from the LogicalType
+			break;
+		case LogicalTypeId::DATE:
+		case LogicalTypeId::TIMESTAMP:
+		case LogicalTypeId::TIME:
+			fprintf(stderr, "[DEBUG] MUST IMPLEMENT TIME TYPE INFO");
+			// TODO may need to implement ArrowDateTimeInfo
+			// Check if needed based on Snowflake data
+			break;
+		default:
+			type_info = nullptr;
+			break;
+		}
+
+		conversion_map[map_idx] = make_shared_ptr<ArrowType>(type, std::move(type_info));
+	}
+	fprintf(stderr, "[DEBUG] Conversion map built with %zu entries\n", conversion_map.size());
+
+	int batch_count = 0;
+	while (true) {
+		ArrowArray arrow_array;
+		fprintf(stderr, "[DEBUG] Getting next Arrow batch %d...\n", batch_count);
+		int return_code = stream.get_next(&stream, &arrow_array);
+
+		if (return_code != 0) {
+			fprintf(stderr, "[DEBUG] ArrowArrayStream returned error code: %d\n", return_code);
+			throw IOException("ArrowArrayStream returned error code: " + std::to_string(return_code));
+		}
+
+		if (arrow_array.release == nullptr) {
+			fprintf(stderr, "[DEBUG] No more Arrow batches\n");
+			break;
+		}
+		fprintf(stderr, "[DEBUG] Got Arrow batch %d with %ld rows\n", batch_count, arrow_array.length);
+		batch_count++;
+
+		auto temp_chunk = make_uniq<DataChunk>();
+		temp_chunk->Initialize(Allocator::DefaultAllocator(), expected_types);
+
+		auto array_wrapper = make_uniq<ArrowArrayWrapper>();
+		array_wrapper->arrow_array = arrow_array;
+
+		fprintf(stderr, "[DEBUG] Arrow array details: n_buffers=%ld, n_children=%ld\n", arrow_array.n_buffers,
+		        arrow_array.n_children);
+
+		fprintf(stderr, "[DEBUG] Creating ArrowScanLocalState...\n");
+		ArrowScanLocalState local_state(std::move(array_wrapper), context);
+
+		fprintf(stderr, "[DEBUG] Calling ArrowToDuckDB with conversion_map size %zu...\n", conversion_map.size());
+		try {
+			ArrowTableFunction::ArrowToDuckDB(local_state, conversion_map, *temp_chunk, 0);
+			fprintf(stderr, "[DEBUG] ArrowToDuckDB completed, chunk size: %zu\n", temp_chunk->size());
+		} catch (const std::exception &e) {
+			fprintf(stderr, "[ERROR] ArrowToDuckDB failed: %s\n", e.what());
+			throw;
+		}
+
+		collected_chunks.emplace_back(std::move(temp_chunk));
+	}
+
+	auto result_chunk = make_uniq<DataChunk>();
+	result_chunk->Initialize(Allocator::DefaultAllocator(), expected_types);
+
+	fprintf(stderr, "[DEBUG] Collected %zu chunks, combining them...\n", collected_chunks.size());
+	for (const auto &chunk : collected_chunks) {
+		result_chunk->Append(*chunk);
+	}
+	fprintf(stderr, "[DEBUG] Final result chunk has %zu rows\n", result_chunk->size());
+
+	if (schema.release) {
+		schema.release(&schema);
+	}
+
+	stream.release(&stream);
+	CheckError(AdbcStatementRelease(&statement, &error), "Failed to release AdbcStatement", &error);
+
+	fprintf(stderr, "[DEBUG] ExecuteAndGetChunk completed successfully\n");
+	return result_chunk;
+}
+
+vector<string> SnowflakeClient::ExecuteAndGetStrings(ClientContext &context, const string &query,
+                                                     const string &expected_col_name) {
 	if (!connected) {
 		throw IOException("Connection must be created before ListTables is called");
 	}
@@ -316,50 +455,64 @@ unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context
 	CheckError(status, "Failed to execute AdbcStatement with SQL query: " + query, &error);
 
 	ArrowSchema schema = {};
-	stream.get_schema(&stream, &schema);
-
-	vector<unique_ptr<DataChunk>> collected_chunks;
-
-	arrow_column_map_t conversion_map;
-	for (idx_t map_idx = 0; map_idx < expected_types.size(); map_idx++) {
-		conversion_map[map_idx] = make_shared_ptr<ArrowType>(expected_types[map_idx]);
+	int schema_result = stream.get_schema(&stream, &schema);
+	if (schema_result != 0 || schema.release == nullptr) {
+		throw IOException("Failed to get Arrow schema from stream");
 	}
+
+	if (!expected_col_name.empty()) {
+		if (schema.n_children > 0 && schema.children[0]->name) {
+			if (!StringUtil::CIEquals(schema.children[0]->name, expected_col_name)) {
+				throw IOException("Expected column '" + expected_col_name + "' but got '" + schema.children[0]->name +
+				                  "'");
+			}
+		}
+	}
+
+	vector<string> results;
 
 	while (true) {
 		ArrowArray arrow_array;
 		int return_code = stream.get_next(&stream, &arrow_array);
 
 		if (return_code != 0) {
-			throw IOException("ArrowArrayStream returned error code: " + return_code);
+			throw IOException("ArrowArrayStream returned error code: " + std::to_string(return_code));
 		}
 
 		if (arrow_array.release == nullptr) {
 			break;
 		}
 
-		auto temp_chunk = make_uniq<DataChunk>();
-		temp_chunk->Initialize(Allocator::DefaultAllocator(), expected_types);
+		if (arrow_array.n_children > 0) {
+			ArrowArray *column = arrow_array.children[0];
+			if (column && column->buffers && column->n_buffers >= 3) {
+				// For string columns: buffer[0] is validity, buffer[1] is offsets, buffer[2] is data
+				const int32_t *offsets = (const int32_t *)column->buffers[1];
+				const char *data = (const char *)column->buffers[2];
 
-		auto array_wrapper = make_uniq<ArrowArrayWrapper>();
-		array_wrapper->arrow_array = arrow_array;
-		ArrowScanLocalState local_state(std::move(array_wrapper), context);
+				for (int64_t i = 0; i < column->length; i++) {
+					int32_t start = offsets[i];
+					int32_t end = offsets[i + 1];
+					std::string value(data + start, end - start);
+					results.push_back(value);
+				}
+			}
+		}
 
-		ArrowTableFunction::ArrowToDuckDB(local_state, conversion_map, *temp_chunk, 0);
-
-		collected_chunks.emplace_back(std::move(temp_chunk));
+		if (arrow_array.release) {
+			arrow_array.release(&arrow_array);
+		}
 	}
 
-	auto result_chunk = make_uniq<DataChunk>();
-	result_chunk->Initialize(Allocator::DefaultAllocator(), expected_types);
-
-	for (const auto &chunk : collected_chunks) {
-		result_chunk->Append(*chunk);
+	if (schema.release) {
+		schema.release(&schema);
 	}
-
-	stream.release(&stream);
+	if (stream.release) {
+		stream.release(&stream);
+	}
 	CheckError(AdbcStatementRelease(&statement, &error), "Failed to release AdbcStatement", &error);
 
-	return result_chunk;
+	return results;
 }
 
 } // namespace snowflake
