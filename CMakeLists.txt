@@ -18,16 +18,18 @@ include_directories(src/include)
 
 set(EXTENSION_SOURCES 
     src/snowflake_extension.cpp
-    src/snowflake_connection.cpp
     src/snowflake_arrow_utils.cpp
     src/snowflake_scan.cpp
+    src/snowflake_client.cpp
+    src/snowflake_client_manager.cpp
+    src/snowflake_config.cpp
 )
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
 # Define the Snowflake ADBC driver library path
-set(SNOWFLAKE_ADBC_LIB "arrow-adbc/c/driver/snowflake/libadbc_driver_snowflake.so")
+set(SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.so")
 
 # Link dependencies in both the static library and the loadable extension
 # Note: Snowflake ADBC driver will be loaded dynamically to avoid symbol conflicts
@@ -46,10 +48,10 @@ target_link_libraries(${LOADABLE_EXTENSION_NAME}
 
 # Define path to Snowflake ADBC shared library for dynamic loading
 target_compile_definitions(${EXTENSION_NAME} PRIVATE 
-    -DSNOWFLAKE_ADBC_LIB_PATH="${SNOWFLAKE_ADBC_LIB}"
+    -DSNOWFLAKE_ADBC_LIB="${SNOWFLAKE_ADBC_LIB}"
 )
 target_compile_definitions(${LOADABLE_EXTENSION_NAME} PRIVATE 
-    -DSNOWFLAKE_ADBC_LIB_PATH="${SNOWFLAKE_ADBC_LIB}"
+    -DSNOWFLAKE_ADBC_LIB="${SNOWFLAKE_ADBC_LIB}"
 )
 
 install(
