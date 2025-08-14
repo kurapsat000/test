@@ -33,6 +33,10 @@ set(EXTENSION_SOURCES
     src/storage/snowflake_table_set.cpp
 )
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      add_definitions(-DDEBUG_SNOWFLAKE)
+endif()
+
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 set_property(TARGET ${LOADABLE_EXTENSION_NAME} PROPERTY "EXTENSION_VERSION_SCRIPT" "TRUE")

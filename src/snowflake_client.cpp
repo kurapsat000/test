@@ -1,4 +1,5 @@
 #include "duckdb/common/exception.hpp"
+#include "duckdb/common/string_util.hpp"
 #include "duckdb/function/table/arrow.hpp"
 
 #include "snowflake_client.hpp"
@@ -203,31 +204,30 @@ void SnowflakeClient::CheckError(const AdbcStatusCode status, const std::string 
 
 vector<string> SnowflakeClient::ListSchemas(ClientContext &context) {
 	const string schema_query = "SELECT schema_name FROM " + config.database + ".INFORMATION_SCHEMA.SCHEMATA";
-	return ExecuteAndGetStrings(context, schema_query, "schema_name");
-}
+	auto result = ExecuteAndGetStrings(context, schema_query, {"schema_name"});
+	auto schemas = result[0];
 
-vector<string> SnowflakeClient::ListAllTables(ClientContext &context) {
-	fprintf(stderr, "[DEBUG] ListAllTables called for database: %s\n", config.database.c_str());
-	const string table_name_query = "SELECT table_name FROM " + config.database + ".information_schema.tables";
-	fprintf(stderr, "[DEBUG] Table query: %s\n", table_name_query.c_str());
-
-	auto table_names = ExecuteAndGetStrings(context, table_name_query, "table_name");
-
-	fprintf(stderr, "[DEBUG] ListAllTables returning %zu tables\n", table_names.size());
-	for (const auto &table_name : table_names) {
-		fprintf(stderr, "[DEBUG] Found table: %s\n", table_name.c_str());
+	for (auto &schema : schemas) {
+		schema = StringUtil::Lower(schema);
 	}
-	return table_names;
+
+	return schemas;
 }
 
-vector<string> SnowflakeClient::ListTables(ClientContext &context, const string &schema) {
+vector<string> SnowflakeClient::ListTables(ClientContext &context, const string &schema = "") {
 	fprintf(stderr, "[DEBUG] ListTables called for schema: %s in database: %s\n", schema.c_str(),
 	        config.database.c_str());
-	const string table_name_query = "SELECT table_name FROM " + config.database +
-	                                ".information_schema.tables WHERE table_schema = '" + schema + "'";
+	const string upper_schema = StringUtil::Upper(schema);
+	const string table_name_query = "SELECT table_name FROM " + config.database + ".information_schema.tables" +
+	                                (schema != "" ? " WHERE table_schema = '" + upper_schema + "'" : "");
 	fprintf(stderr, "[DEBUG] Table query: %s\n", table_name_query.c_str());
 
-	auto table_names = ExecuteAndGetStrings(context, table_name_query, "table_name");
+	auto result = ExecuteAndGetStrings(context, table_name_query, {"table_name"});
+	auto table_names = result[0];
+
+	for (auto &table_name : table_names) {
+		table_name = StringUtil::Lower(table_name);
+	}
 
 	fprintf(stderr, "[DEBUG] ListTables returning %zu tables\n", table_names.size());
 	for (const auto &table_name : table_names) {
@@ -238,198 +238,58 @@ vector<string> SnowflakeClient::ListTables(ClientContext &context, const string 
 
 vector<SnowflakeColumn> SnowflakeClient::GetTableInfo(ClientContext &context, const string &schema,
                                                       const string &table_name) {
+	const string upper_schema = StringUtil::Upper(schema);
+	const string upper_table = StringUtil::Upper(table_name);
+
 	const string table_info_query = "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM " + config.database +
-	                                ".information_schema.columns WHERE table_schema = '" + schema +
-	                                "' AND table_name = '" + table_name + "' ORDER BY ORDINAL_POSITION";
+	                                ".information_schema.columns WHERE table_schema = '" + upper_schema +
+	                                "' AND table_name = '" + upper_table + "' ORDER BY ORDINAL_POSITION";
 
+	DPRINT("GetTableInfo query: %s\n", table_info_query.c_str());
 	const vector<string> expected_names = {"COLUMN_NAME", "DATA_TYPE", "IS_NULLABLE"};
-	const vector<LogicalType> expected_types = {LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR};
 
-	auto chunk = ExecuteAndGetChunk(context, table_info_query, expected_types, expected_names);
+	auto result = ExecuteAndGetStrings(context, table_info_query, expected_names);
+
+	if (result.empty() || result[0].empty()) {
+		throw CatalogException("Cannot retrieve column information for table '%s.%s'. "
+		                       "The table may have been dropped or you may lack permissions.",
+		                       schema, table_name);
+	}
 
 	vector<SnowflakeColumn> col_data;
 
-	for (idx_t chunk_idx = 0; chunk_idx < chunk->size(); chunk_idx++) {
-		string nullable_str = chunk->GetValue(2, chunk_idx).ToString();
-		bool is_nullable = (nullable_str == "YES");
+	for (idx_t row_idx = 0; row_idx < result[0].size(); row_idx++) {
+		string column_name = StringUtil::Lower(result[0][row_idx]);
+		string data_type = result[1][row_idx];
+		string nullable = result[2][row_idx];
 
-		string type_str = chunk->GetValue(1, chunk_idx).ToString();
-		LogicalType duckdb_type = SnowflakeTypeToLogicalType(type_str);
+		bool is_nullable = (nullable == "YES");
+		LogicalType duckdb_type = SnowflakeTypeToLogicalType(data_type);
 
-		SnowflakeColumn new_col = {chunk->GetValue(0, chunk_idx).ToString(), duckdb_type, is_nullable};
+		SnowflakeColumn new_col = {column_name, duckdb_type, is_nullable};
 		col_data.emplace_back(new_col);
 	}
 
 	return col_data;
 }
 
-unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context, const string &query,
-                                                          const vector<LogicalType> &expected_types,
-                                                          const vector<string> &expected_names) {
-	fprintf(stderr, "[DEBUG] ExecuteAndGetChunk called with query: %s\n", query.c_str());
-	if (!connected) {
-		fprintf(stderr, "[DEBUG] ExecuteAndGetChunk: Not connected!\n");
-		throw IOException("Connection must be created before ExecuteAndGetChunk is called");
-	}
-	fprintf(stderr, "[DEBUG] ExecuteAndGetChunk: Connection is active\n");
-
-	AdbcStatement statement;
-	AdbcError error;
-	AdbcStatusCode status;
-
-	fprintf(stderr, "[DEBUG] Creating ADBC statement...\n");
-	status = AdbcStatementNew(GetConnection(), &statement, &error);
-	CheckError(status, "Failed to create AdbcStatement", &error);
-	fprintf(stderr, "[DEBUG] ADBC statement created successfully\n");
-
-	fprintf(stderr, "[DEBUG] Setting SQL query on statement...\n");
-	status = AdbcStatementSetSqlQuery(&statement, query.c_str(), &error);
-	CheckError(status, "Failed to set AdbcStatement with SQL query: " + query, &error);
-	fprintf(stderr, "[DEBUG] SQL query set successfully\n");
-
-	ArrowArrayStream stream = {};
-	int64_t rows_affected = -1;
-
-	fprintf(stderr, "[DEBUG] Executing SQL query...\n");
-	status = AdbcStatementExecuteQuery(&statement, &stream, &rows_affected, &error);
-	CheckError(status, "Failed to execute AdbcStatement with SQL query: " + query, &error);
-	fprintf(stderr, "[DEBUG] SQL query executed successfully, rows_affected: %ld\n", rows_affected);
-
-	fprintf(stderr, "[DEBUG] Getting Arrow schema...\n");
-	ArrowSchema schema = {};
-	int schema_result = stream.get_schema(&stream, &schema);
-	fprintf(stderr, "[DEBUG] Arrow schema obtained, result: %d\n", schema_result);
-
-	if (schema.release == nullptr) {
-		fprintf(stderr, "[ERROR] Arrow schema is NULL!\n");
-		throw IOException("Failed to get Arrow schema from stream");
-	}
-
-	if (static_cast<size_t>(schema.n_children) != expected_types.size()) {
-		throw IOException("Schema has " + std::to_string(schema.n_children) + " columns but expected " +
-		                  std::to_string(expected_types.size()));
-	}
-
-	ArrowSchemaWrapper schema_wrapper;
-	schema_wrapper.arrow_schema = schema;
-
-	ArrowTableType arrow_table;
-	vector<LogicalType> actual_types;
-	vector<string> actual_names;
-
-	ArrowTableFunction::PopulateArrowTableType(DBConfig::GetConfig(context), arrow_table, schema_wrapper, actual_names,
-	                                           actual_types);
-
-	if (actual_types.size() != expected_types.size()) {
-		throw IOException("Schema mismatch: expected " + to_string(expected_types.size()) + " columns but got " +
-		                  to_string(actual_types.size()));
-	}
-
-	for (size_t name_idx = 0; name_idx < expected_names.size(); name_idx++) {
-		if (!StringUtil::CIEquals(expected_names[name_idx], actual_names[name_idx])) {
-			throw IOException("Expected column '" + expected_names[name_idx] + "' at position " + to_string(name_idx) +
-			                  " but got '" + actual_names[name_idx] + "'");
-		}
-	}
-
-	vector<unique_ptr<DataChunk>> collected_chunks;
-	int batch_count = 0;
-
-	while (true) {
-		ArrowArray arrow_array;
-		fprintf(stderr, "[DEBUG] Getting next Arrow batch %d...\n", batch_count);
-		int return_code = stream.get_next(&stream, &arrow_array);
-
-		if (return_code != 0) {
-			fprintf(stderr, "[DEBUG] ArrowArrayStream returned error code: %d\n", return_code);
-			throw IOException("ArrowArrayStream returned error code: " + std::to_string(return_code));
-		}
-
-		if (arrow_array.release == nullptr) {
-			fprintf(stderr, "[DEBUG] No more Arrow batches\n");
-			break;
-		}
-
-		if (arrow_array.null_count == arrow_array.length) {
-			fprintf(stderr, "[WARNING] Arrow array is all nulls!\n");
-		}
-
-		for (int64_t i = 0; i < arrow_array.n_children; i++) {
-			if (arrow_array.children[i]) {
-				fprintf(stderr, "[DEBUG] Child %ld: length=%ld, null_count=%ld\n", i, arrow_array.children[i]->length,
-				        arrow_array.children[i]->null_count);
-			}
-		}
-
-		fprintf(stderr, "[DEBUG] Got Arrow batch %d with %ld rows\n", batch_count, arrow_array.length);
-		batch_count++;
-
-		auto temp_chunk = make_uniq<DataChunk>();
-		temp_chunk->Initialize(Allocator::DefaultAllocator(), actual_types);
-
-		auto array_wrapper = make_uniq<ArrowArrayWrapper>();
-		array_wrapper->arrow_array = arrow_array;
-
-		fprintf(stderr, "[DEBUG] Arrow array details: n_buffers=%ld, n_children=%ld\n", arrow_array.n_buffers,
-		        arrow_array.n_children);
-
-		fprintf(stderr, "[DEBUG] Creating ArrowScanLocalState...\n");
-		ArrowScanLocalState local_state(std::move(array_wrapper), context);
-		fprintf(stderr, "[DEBUG] ArrowScanLocalState initialized\n");
-		fprintf(stderr, "[DEBUG] Arrow table has %zu columns\n", arrow_table.GetColumns().size());
-
-		for (size_t i = 0; i < arrow_table.GetColumns().size(); i++) {
-			fprintf(stderr, "[DEBUG] Column %zu type: %s\n", i, actual_types[i].ToString().c_str());
-		}
-
-		try {
-			ArrowTableFunction::ArrowToDuckDB(local_state, arrow_table.GetColumns(), *temp_chunk, batch_count - 1);
-			fprintf(stderr, "[DEBUG] ArrowToDuckDB completed, chunk size: %zu\n", temp_chunk->size());
-		} catch (const std::exception &e) {
-			fprintf(stderr, "[ERROR] ArrowToDuckDB failed: %s\n", e.what());
-			throw;
-		}
-
-		collected_chunks.emplace_back(std::move(temp_chunk));
-	}
-
-	// optimization for small result sets
-	if (collected_chunks.size() == 1) {
-		fprintf(stderr, "[DEBUG] Only one chunk read, skipping chunk consolidation\n");
-		return std::move(collected_chunks[0]);
-	}
-
-	auto result_chunk = make_uniq<DataChunk>();
-	result_chunk->Initialize(Allocator::DefaultAllocator(), actual_types);
-
-	fprintf(stderr, "[DEBUG] Collected %zu chunks, combining them...\n", collected_chunks.size());
-	for (const auto &chunk : collected_chunks) {
-		result_chunk->Append(*chunk);
-	}
-	fprintf(stderr, "[DEBUG] Final result chunk has %zu rows\n", result_chunk->size());
-
-	if (stream.release) {
-		stream.release(&stream);
-	}
-
-	CheckError(AdbcStatementRelease(&statement, &error), "Failed to release AdbcStatement", &error);
-
-	fprintf(stderr, "[DEBUG] ExecuteAndGetChunk completed successfully\n");
-	return result_chunk;
-}
-
-vector<string> SnowflakeClient::ExecuteAndGetStrings(ClientContext &context, const string &query,
-                                                     const string &expected_col_name) {
+vector<vector<string>> SnowflakeClient::ExecuteAndGetStrings(ClientContext &context, const string &query,
+                                                             const vector<string> &expected_col_names) {
 	if (!connected) {
 		throw IOException("Connection must be created before ListTables is called");
 	}
 
 	AdbcStatement statement;
+	std::memset(&statement, 0, sizeof(statement));
 	AdbcError error;
+	std::memset(&error, 0, sizeof(error));
 	AdbcStatusCode status;
 
+	DPRINT("ExecuteAndGetStrings: Query='%s'\n", query.c_str());
+	DPRINT("About to create statement...\n");
 	status = AdbcStatementNew(GetConnection(), &statement, &error);
 	CheckError(status, "Failed to create AdbcStatement", &error);
+	DPRINT("Statement created successfully\n");
 
 	status = AdbcStatementSetSqlQuery(&statement, query.c_str(), &error);
 	CheckError(status, "Failed to set AdbcStatement with SQL query: " + query, &error);
@@ -437,6 +297,7 @@ vector<string> SnowflakeClient::ExecuteAndGetStrings(ClientContext &context, con
 	ArrowArrayStream stream = {};
 	int64_t rows_affected = -1;
 
+	DPRINT("Executing statement\n");
 	status = AdbcStatementExecuteQuery(&statement, &stream, &rows_affected, &error);
 	CheckError(status, "Failed to execute AdbcStatement with SQL query: " + query, &error);
 
@@ -446,16 +307,25 @@ vector<string> SnowflakeClient::ExecuteAndGetStrings(ClientContext &context, con
 		throw IOException("Failed to get Arrow schema from stream");
 	}
 
-	if (!expected_col_name.empty()) {
-		if (schema.n_children > 0 && schema.children[0]->name) {
-			if (!StringUtil::CIEquals(schema.children[0]->name, expected_col_name)) {
-				throw IOException("Expected column '" + expected_col_name + "' but got '" + schema.children[0]->name +
-				                  "'");
+	ArrowSchemaWrapper schema_wrapper;
+	schema_wrapper.arrow_schema = schema;
+
+	if (!expected_col_names.empty()) {
+		if (schema.n_children != static_cast<int64_t>(expected_col_names.size())) {
+			throw IOException("Expected " + to_string(expected_col_names.size()) + " columns but got " +
+			                  to_string(schema.n_children));
+		}
+
+		for (idx_t col_idx = 0; col_idx < expected_col_names.size(); col_idx++) {
+			if (schema.children[col_idx]->name &&
+			    !StringUtil::CIEquals(schema.children[col_idx]->name, expected_col_names[col_idx])) {
+				throw IOException("Expected column '" + expected_col_names[col_idx] + "' but got '" +
+				                  schema.children[col_idx]->name + "'");
 			}
 		}
 	}
 
-	vector<string> results;
+	vector<vector<string>> results(schema.n_children);
 
 	while (true) {
 		ArrowArray arrow_array;
@@ -469,34 +339,48 @@ vector<string> SnowflakeClient::ExecuteAndGetStrings(ClientContext &context, con
 			break;
 		}
 
-		if (arrow_array.n_children > 0) {
-			ArrowArray *column = arrow_array.children[0];
+		ArrowArrayWrapper array_wrapper;
+		array_wrapper.arrow_array = arrow_array;
+
+		for (idx_t col_idx = 0; col_idx < arrow_array.n_children; col_idx++) {
+			ArrowArray *column = arrow_array.children[col_idx];
 			if (column && column->buffers && column->n_buffers >= 3) {
 				// For string columns: buffer[0] is validity, buffer[1] is offsets, buffer[2] is data
 				const int32_t *offsets = (const int32_t *)column->buffers[1];
 				const char *data = (const char *)column->buffers[2];
+				const uint8_t *validity = nullptr;
 
-				for (int64_t i = 0; i < column->length; i++) {
-					int32_t start = offsets[i];
-					int32_t end = offsets[i + 1];
+				if (column->buffers[0]) {
+					validity = (const uint8_t *)column->buffers[0];
+				}
+
+				for (int64_t row_idx = 0; row_idx < column->length; row_idx++) {
+					if (validity && column->null_count > 0) {
+						size_t byte_idx = row_idx / 8;
+						size_t bit_idx = row_idx % 8;
+						bool is_valid = (validity[byte_idx] >> bit_idx) & 1;
+
+						if (!is_valid) {
+							// TODO possibly push NULL instead of ""?
+							results[col_idx].push_back("");
+							continue;
+						}
+					}
+
+					int32_t start = offsets[row_idx];
+					int32_t end = offsets[row_idx + 1];
 					std::string value(data + start, end - start);
-					results.push_back(value);
+					results[col_idx].push_back(value);
 				}
 			}
 		}
-
-		if (arrow_array.release) {
-			arrow_array.release(&arrow_array);
-		}
-	}
-
-	if (schema.release) {
-		schema.release(&schema);
 	}
 
 	if (stream.release) {
 		stream.release(&stream);
 	}
+
+	DPRINT("Releasing statement at %p\n", (void *)&statement);
 	CheckError(AdbcStatementRelease(&statement, &error), "Failed to release AdbcStatement", &error);
 
 	return results;

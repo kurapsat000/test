@@ -1,5 +1,11 @@
 #pragma once
 
+#ifdef DEBUG_SNOWFLAKE
+#define DPRINT(...) fprintf(stderr, "[DEBUG] " __VA_ARGS__)
+#else
+#define DPRINT(...) ((void)0)
+#endif
+
 #include "duckdb.hpp"
 #include "snowflake_config.hpp"
 
@@ -32,7 +38,6 @@ public:
 	const SnowflakeConfig &GetConfig() const;
 
 	vector<string> ListSchemas(ClientContext &context);
-	vector<string> ListAllTables(ClientContext &config);
 	vector<string> ListTables(ClientContext &context, const string &schema);
 	vector<SnowflakeColumn> GetTableInfo(ClientContext &context, const string &schema, const string &table_name);
 
@@ -42,11 +47,8 @@ private:
 	AdbcConnection connection;
 	bool connected = false;
 
-	unique_ptr<DataChunk> ExecuteAndGetChunk(ClientContext &context, const string &query,
-	                                         const vector<LogicalType> &expected_types,
-	                                         const vector<string> &expected_names = {});
-	vector<string> ExecuteAndGetStrings(ClientContext &context, const string &query,
-	                                    const string &expected_col_name = "");
+	vector<vector<string>> ExecuteAndGetStrings(ClientContext &context, const string &query,
+	                                            const vector<string> &expected_col_names);
 	void InitializeDatabase(const SnowflakeConfig &config);
 	void InitializeConnection();
 	void CheckError(const AdbcStatusCode status, const std::string &operation, AdbcError *error);

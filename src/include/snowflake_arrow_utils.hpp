@@ -34,6 +34,10 @@ struct SnowflakeArrowStreamFactory {
 			AdbcStatementRelease(&statement, &error);
 		}
 	}
+
+	// debug members
+	int schema_call_count = 0;
+	int execute_call_count = 0;
 };
 
 // Function to produce an ArrowArrayStreamWrapper from the factory

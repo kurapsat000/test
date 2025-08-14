@@ -15,6 +15,17 @@ namespace snowflake {
 
 static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableFunctionBindInput &input,
                                                   vector<LogicalType> &return_types, vector<string> &names) {
+	DPRINT("SnowflakeScanBind called with %zu inputs\n", input.inputs.size());
+
+	if (input.inputs.empty()) {
+		DPRINT("SnowflakeScanBind: No inputs, likely called from table entry\n");
+		// This might be called from SnowflakeTableEntry where bind_data is already set
+		// But we can't access it here directly...
+		throw BinderException("snowflake_scan requires at least 2 parameters when called directly");
+	}
+
+	DPRINT("SnowflakeScanBind: Creating new bind data from inputs\n");
+
 	// Validate parameters
 	if (input.inputs.size() < 2) {
 		throw BinderException("snowflake_scan requires at least 2 parameters: connection_string and query");
@@ -41,8 +52,10 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 
 	// Get the schema from Snowflake using ADBC's ExecuteSchema
 	// This executes the query with schema-only mode to get column information
+	DPRINT("SnowflakeScanBind: About to call SnowflakeGetArrowSchema\n");
 	SnowflakeGetArrowSchema(reinterpret_cast<ArrowArrayStream *>(bind_data->factory.get()),
 	                        bind_data->schema_root.arrow_schema);
+	DPRINT("SnowflakeScanBind: SnowflakeGetArrowSchema completed\n");
 
 	// Use DuckDB's Arrow integration to populate the table type information
 	// This converts Arrow schema to DuckDB types and handles all type mappings
