@@ -310,67 +310,31 @@ unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context
 		                  std::to_string(expected_types.size()));
 	}
 
-	for (size_t name_idx = 0; name_idx < expected_names.size(); name_idx++) {
-		if (!schema.children[name_idx]->name) {
-			throw IOException("Column at position " + std::to_string(name_idx) + " has null name");
-		}
+	ArrowSchemaWrapper schema_wrapper;
+	schema_wrapper.arrow_schema = schema;
 
-		if (!StringUtil::CIEquals(schema.children[name_idx]->name, expected_names[name_idx])) {
-			throw IOException("Expected column '" + expected_names[name_idx] + "' at position " +
-			                  std::to_string(name_idx) + " but got '" + schema.children[name_idx]->name + "'");
-		}
+	ArrowTableType arrow_table;
+	vector<LogicalType> actual_types;
+	vector<string> actual_names;
+
+	ArrowTableFunction::PopulateArrowTableType(DBConfig::GetConfig(context), arrow_table, schema_wrapper, actual_names,
+	                                           actual_types);
+
+	if (actual_types.size() != expected_types.size()) {
+		throw IOException("Schema mismatch: expected " + to_string(expected_types.size()) + " columns but got " +
+		                  to_string(actual_types.size()));
 	}
 
-	fprintf(stderr, "[DEBUG] Arrow schema: format=%s, n_children=%ld\n", schema.format ? schema.format : "NULL",
-	        schema.n_children);
-	for (int64_t i = 0; i < schema.n_children && i < (int64_t)expected_types.size(); i++) {
-		fprintf(stderr, "[DEBUG] Arrow column %ld: format='%s', name='%s'\n", i,
-		        schema.children[i]->format ? schema.children[i]->format : "NULL",
-		        schema.children[i]->name ? schema.children[i]->name : "NULL");
+	for (size_t name_idx = 0; name_idx < expected_names.size(); name_idx++) {
+		if (!StringUtil::CIEquals(expected_names[name_idx], actual_names[name_idx])) {
+			throw IOException("Expected column '" + expected_names[name_idx] + "' at position " + to_string(name_idx) +
+			                  " but got '" + actual_names[name_idx] + "'");
+		}
 	}
 
 	vector<unique_ptr<DataChunk>> collected_chunks;
-
-	fprintf(stderr, "[DEBUG] Building conversion map for %zu columns...\n", expected_types.size());
-	arrow_column_map_t conversion_map;
-	for (idx_t map_idx = 0; map_idx < expected_types.size(); map_idx++) {
-		const auto &type = expected_types[map_idx];
-		fprintf(stderr, "[DEBUG] Column %zu: type %s\n", map_idx, expected_types[map_idx].ToString().c_str());
-		unique_ptr<ArrowTypeInfo> type_info;
-
-		switch (type.id()) {
-		case LogicalTypeId::VARCHAR:
-		case LogicalTypeId::BLOB:
-			type_info = make_uniq<ArrowStringInfo>(ArrowVariableSizeType::NORMAL);
-			break;
-		case LogicalTypeId::LIST:
-			// TODO may need to implement ArrowListInfo (may need child info)
-			break;
-		case LogicalTypeId::STRUCT:
-			// TODO may need to implement ArrowStructInfo
-			break;
-		case LogicalTypeId::DECIMAL:
-			fprintf(stderr, "[DEBUG] MUST DECIMAL TIME TYPE INFO");
-			// TODO may need to implement ArrowDecimalInfo
-			// extract precision and scale from the LogicalType
-			break;
-		case LogicalTypeId::DATE:
-		case LogicalTypeId::TIMESTAMP:
-		case LogicalTypeId::TIME:
-			fprintf(stderr, "[DEBUG] MUST IMPLEMENT TIME TYPE INFO");
-			// TODO may need to implement ArrowDateTimeInfo
-			// Check if needed based on Snowflake data
-			break;
-		default:
-			type_info = nullptr;
-			break;
-		}
-
-		conversion_map[map_idx] = make_shared_ptr<ArrowType>(type, std::move(type_info));
-	}
-	fprintf(stderr, "[DEBUG] Conversion map built with %zu entries\n", conversion_map.size());
-
 	int batch_count = 0;
+
 	while (true) {
 		ArrowArray arrow_array;
 		fprintf(stderr, "[DEBUG] Getting next Arrow batch %d...\n", batch_count);
@@ -385,11 +349,23 @@ unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context
 			fprintf(stderr, "[DEBUG] No more Arrow batches\n");
 			break;
 		}
+
+		if (arrow_array.null_count == arrow_array.length) {
+			fprintf(stderr, "[WARNING] Arrow array is all nulls!\n");
+		}
+
+		for (int64_t i = 0; i < arrow_array.n_children; i++) {
+			if (arrow_array.children[i]) {
+				fprintf(stderr, "[DEBUG] Child %ld: length=%ld, null_count=%ld\n", i, arrow_array.children[i]->length,
+				        arrow_array.children[i]->null_count);
+			}
+		}
+
 		fprintf(stderr, "[DEBUG] Got Arrow batch %d with %ld rows\n", batch_count, arrow_array.length);
 		batch_count++;
 
 		auto temp_chunk = make_uniq<DataChunk>();
-		temp_chunk->Initialize(Allocator::DefaultAllocator(), expected_types);
+		temp_chunk->Initialize(Allocator::DefaultAllocator(), actual_types);
 
 		auto array_wrapper = make_uniq<ArrowArrayWrapper>();
 		array_wrapper->arrow_array = arrow_array;
@@ -399,10 +375,15 @@ unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context
 
 		fprintf(stderr, "[DEBUG] Creating ArrowScanLocalState...\n");
 		ArrowScanLocalState local_state(std::move(array_wrapper), context);
+		fprintf(stderr, "[DEBUG] ArrowScanLocalState initialized\n");
+		fprintf(stderr, "[DEBUG] Arrow table has %zu columns\n", arrow_table.GetColumns().size());
 
-		fprintf(stderr, "[DEBUG] Calling ArrowToDuckDB with conversion_map size %zu...\n", conversion_map.size());
+		for (size_t i = 0; i < arrow_table.GetColumns().size(); i++) {
+			fprintf(stderr, "[DEBUG] Column %zu type: %s\n", i, actual_types[i].ToString().c_str());
+		}
+
 		try {
-			ArrowTableFunction::ArrowToDuckDB(local_state, conversion_map, *temp_chunk, 0);
+			ArrowTableFunction::ArrowToDuckDB(local_state, arrow_table.GetColumns(), *temp_chunk, batch_count - 1);
 			fprintf(stderr, "[DEBUG] ArrowToDuckDB completed, chunk size: %zu\n", temp_chunk->size());
 		} catch (const std::exception &e) {
 			fprintf(stderr, "[ERROR] ArrowToDuckDB failed: %s\n", e.what());
@@ -412,8 +393,14 @@ unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context
 		collected_chunks.emplace_back(std::move(temp_chunk));
 	}
 
+	// optimization for small result sets
+	if (collected_chunks.size() == 1) {
+		fprintf(stderr, "[DEBUG] Only one chunk read, skipping chunk consolidation\n");
+		return std::move(collected_chunks[0]);
+	}
+
 	auto result_chunk = make_uniq<DataChunk>();
-	result_chunk->Initialize(Allocator::DefaultAllocator(), expected_types);
+	result_chunk->Initialize(Allocator::DefaultAllocator(), actual_types);
 
 	fprintf(stderr, "[DEBUG] Collected %zu chunks, combining them...\n", collected_chunks.size());
 	for (const auto &chunk : collected_chunks) {
@@ -421,11 +408,10 @@ unique_ptr<DataChunk> SnowflakeClient::ExecuteAndGetChunk(ClientContext &context
 	}
 	fprintf(stderr, "[DEBUG] Final result chunk has %zu rows\n", result_chunk->size());
 
-	if (schema.release) {
-		schema.release(&schema);
+	if (stream.release) {
+		stream.release(&stream);
 	}
 
-	stream.release(&stream);
 	CheckError(AdbcStatementRelease(&statement, &error), "Failed to release AdbcStatement", &error);
 
 	fprintf(stderr, "[DEBUG] ExecuteAndGetChunk completed successfully\n");
@@ -507,6 +493,7 @@ vector<string> SnowflakeClient::ExecuteAndGetStrings(ClientContext &context, con
 	if (schema.release) {
 		schema.release(&schema);
 	}
+
 	if (stream.release) {
 		stream.release(&stream);
 	}
