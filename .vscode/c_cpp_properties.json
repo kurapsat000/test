@@ -2,45 +2,22 @@
     "configurations": [
         {
             "name": "Linux",
+            "compileCommands": "${workspaceFolder}/build/release/compile_commands.json",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "configurationProvider": "ms-vscode.cmake-tools",
             "includePath": [
+                "${workspaceFolder}/src",
                 "${workspaceFolder}/src/include",
                 "${workspaceFolder}/duckdb/src/include",
-                "${workspaceFolder}/duckdb/third_party/fsst",
-                "${workspaceFolder}/duckdb/third_party/fmt/include",
-                "${workspaceFolder}/duckdb/third_party/hyperloglog",
-                "${workspaceFolder}/duckdb/third_party/fastpforlib",
-                "${workspaceFolder}/duckdb/third_party/skiplist",
-                "${workspaceFolder}/duckdb/third_party/fast_float",
-                "${workspaceFolder}/duckdb/third_party/re2",
-                "${workspaceFolder}/duckdb/third_party/miniz",
-                "${workspaceFolder}/duckdb/third_party/utf8proc/include",
-                "${workspaceFolder}/duckdb/third_party/concurrentqueue",
-                "${workspaceFolder}/duckdb/third_party/pcg",
-                "${workspaceFolder}/duckdb/third_party/tdigest",
-                "${workspaceFolder}/duckdb/third_party/mbedtls/include",
-                "${workspaceFolder}/duckdb/third_party/jaro_winkler",
-                "${workspaceFolder}/duckdb/third_party/yyjson/include",
-                "${workspaceFolder}/duckdb/third_party/zstd/include",
                 "${workspaceFolder}/duckdb/extension",
-                "${workspaceFolder}/duckdb/extension/core_functions/include",
-                "${workspaceFolder}/duckdb/extension/parquet/include",
-                "${workspaceFolder}/duckdb/extension/jemalloc/include"
-            ],
-            "defines": [
-                "DUCKDB",
-                "DUCKDB_BUILD_LIBRARY",
-                "DUCKDB_MAIN_LIBRARY",
-                "DUCKDB_EXTENSION_CORE_FUNCTIONS_LINKED=1",
-                "DUCKDB_EXTENSION_JEMALLOC_LINKED=1",
-                "DUCKDB_EXTENSION_PARQUET_LINKED=1",
-                "DUCKDB_EXTENSION_QUACK_LINKED=1"
-            ],
-            "compilerPath": "/usr/bin/g++",
-            "cStandard": "c17",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "linux-gcc-x64",
-            "configurationProvider": "clangd",
-            "compileCommands": "${workspaceFolder}/build/clangd/compile_commands.json"
+                "${workspaceFolder}/scripts",
+                "${workspaceFolder}/build/release/vcpkg_installed/x64-linux/include",
+                "${workspaceFolder}/build/debug/vcpkg_installed/x64-linux/include",
+                "~/vcpkg/packages/arrow-adbc_x64-linux/include"
+            ]
         }
     ],
     "version": 4

@@ -54,6 +54,7 @@ void SnowflakeClient::Disconnect() {
 	}
 
 	AdbcError error;
+	std::memset(&error, 0, sizeof(error));
 	AdbcStatusCode status;
 
 	status = AdbcConnectionRelease(&connection, &error);
@@ -71,6 +72,7 @@ bool SnowflakeClient::IsConnected() const {
 
 void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 	AdbcError error;
+	std::memset(&error, 0, sizeof(error));
 	AdbcStatusCode status = AdbcDatabaseNew(&database, &error);
 	CheckError(status, "Failed to create ADBC database", &error);
 
@@ -171,6 +173,7 @@ void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 
 void SnowflakeClient::InitializeConnection() {
 	AdbcError error;
+	std::memset(&error, 0, sizeof(error));
 	AdbcStatusCode status = AdbcConnectionNew(&connection, &error);
 	CheckError(status, "Failed to create connection", &error);
 
@@ -184,8 +187,29 @@ void SnowflakeClient::CheckError(const AdbcStatusCode status, const std::string 
 	}
 
 	std::string error_message = operation + ": " + ((error && error->message) ? error->message : "Unknown ADBC error.");
+	
+	// Print to console for debugging
+	fprintf(stderr, "[Snowflake Connection Error] %s\n", error_message.c_str());
+	
+	// Add more context based on common error patterns
+	if (error && error->message) {
+		std::string msg(error->message);
+		if (msg.find("authentication") != std::string::npos || msg.find("Authentication") != std::string::npos) {
+			fprintf(stderr, "  → Check your username and password\n");
+		} else if (msg.find("account") != std::string::npos || msg.find("Account") != std::string::npos) {
+			fprintf(stderr, "  → Check your account identifier format (e.g., 'account-name.region')\n");
+		} else if (msg.find("warehouse") != std::string::npos || msg.find("Warehouse") != std::string::npos) {
+			fprintf(stderr, "  → Check your warehouse name and permissions\n");
+		} else if (msg.find("database") != std::string::npos || msg.find("Database") != std::string::npos) {
+			fprintf(stderr, "  → Check your database name and permissions\n");
+		} else if (msg.find("network") != std::string::npos || msg.find("Network") != std::string::npos ||
+		           msg.find("connection") != std::string::npos || msg.find("Connection") != std::string::npos) {
+			fprintf(stderr, "  → Check your network connectivity and firewall settings\n");
+		}
+	}
 
-	if (error && error->release) {
+	// Only release if the error has a release function and hasn't been released already
+	if (error && error->release && error->message) {
 		error->release(error);
 	}
 
