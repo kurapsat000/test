@@ -1,6 +1,7 @@
 #include "snowflake_secrets.hpp"
 #include "snowflake_secret_provider.hpp"
 #include "snowflake_client.hpp"
+#include "snowflake_client_manager.hpp"
 #include "snowflake_config.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
@@ -195,67 +196,66 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
                                                  const std::string &warehouse, const std::string &database,
                                                  const std::string &schema, int timeout_seconds) {
 	try {
-		// Check if all required fields are present and non-empty
-		if (username.empty() || password.empty() || account.empty() || database.empty()) {
-			return false;
-		}
-
-		// Check if account format looks valid (basic validation)
-		if (account.find('.') == std::string::npos && account.find('-') == std::string::npos) {
-			// Basic account format validation - should contain dots or hyphens
-			return false;
-		}
-
-		// Check if password is not empty and reasonable length
-		if (password.length() < 1 || password.length() > 100) {
-			return false;
-		}
-
-		// Create SnowflakeConfig with the provided credentials
-		snowflake::SnowflakeConfig config;
-		config.account = account;
-		config.username = username;
-		config.password = password;
-		config.warehouse = warehouse;
-		config.database = database;
-		// Note: schema is not part of SnowflakeConfig, it's handled per-query
-		config.auth_type = snowflake::SnowflakeAuthType::PASSWORD;
-
-		// Use SnowflakeClient to test the connection
-		snowflake::SnowflakeClient client;
+		// Build connection string - same as what scan uses
+		std::unordered_map<std::string, std::string> creds;
+		creds["username"] = username;
+		creds["password"] = password;
+		creds["account"] = account;
+		creds["warehouse"] = warehouse;
+		creds["database"] = database;
+		creds["schema"] = schema;
+		
+		std::string connection_string = BuildConnectionString(creds);
+		
+		// Parse config and connect - exactly like scan does
+		auto config = snowflake::SnowflakeConfig::ParseConnectionString(connection_string);
+		
+		// Use SnowflakeClientManager like scan does
+		auto &client_manager = snowflake::SnowflakeClientManager::GetInstance();
+		
 		try {
-			// This will use the same InitializeDatabase logic
-			client.Connect(config);
+			// Try to get a connection - this will validate the credentials
+			auto connection = client_manager.GetConnection(connection_string, config);
 			
-			// If connection succeeded, test with a simple query
+			// If we got here, connection succeeded
+			// Test with a simple query to be sure
 			AdbcStatement statement;
 			AdbcError error_obj;
 			std::memset(&error_obj, 0, sizeof(error_obj));
+			std::memset(&statement, 0, sizeof(statement));
 			
-			AdbcStatusCode status = AdbcStatementNew(client.GetConnection(), &statement, &error_obj);
+			AdbcStatusCode status = AdbcStatementNew(connection->GetConnection(), &statement, &error_obj);
 			if (status != ADBC_STATUS_OK) {
-				client.Disconnect();
+				if (error_obj.release) {
+					error_obj.release(&error_obj);
+				}
 				return false;
 			}
 
-			// Set query timeout
-			status = AdbcStatementSetOption(&statement, "timeout", std::to_string(timeout_seconds * 1000).c_str(), &error_obj);
-
 			// Prepare and execute simple test query
-			status = AdbcStatementSetSqlQuery(&statement, "SELECT 1 as connection_test", &error_obj);
+			status = AdbcStatementSetSqlQuery(&statement, "SELECT 1", &error_obj);
 			if (status != ADBC_STATUS_OK) {
 				AdbcStatementRelease(&statement, &error_obj);
-				client.Disconnect();
+				if (error_obj.release) {
+					error_obj.release(&error_obj);
+				}
 				return false;
 			}
 
 			// Execute query
-			status = AdbcStatementExecuteQuery(&statement, nullptr, nullptr, &error_obj);
+			ArrowArrayStream stream;
+			std::memset(&stream, 0, sizeof(stream));
+			status = AdbcStatementExecuteQuery(&statement, &stream, nullptr, &error_obj);
 			bool success = (status == ADBC_STATUS_OK);
 			
 			// Clean up
+			if (stream.release) {
+				stream.release(&stream);
+			}
 			AdbcStatementRelease(&statement, &error_obj);
-			client.Disconnect();
+			if (error_obj.release) {
+				error_obj.release(&error_obj);
+			}
 			
 			return success;
 		} catch (const IOException &inner_e) {
