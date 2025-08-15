@@ -1,6 +1,9 @@
+#include "duckdb/common/helper.hpp"
 #define DUCKDB_EXTENSION_MAIN
 
 #include "snowflake_extension.hpp"
+// #include "snowflake_attach.hpp"
+#include "storage/snowflake_storage.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
@@ -24,15 +27,13 @@ inline void SnowflakeVersionScalarFun(DataChunk &args, ExpressionState &state, V
 	result.SetValue(0, val);
 }
 
-// Placeholder for snowflake_scan table function
-// Will be implemented in Phase 2
-
 static void LoadInternal(DatabaseInstance &instance) {
 	// Register the custom Snowflake secret type
 	RegisterSnowflakeSecretType(instance);
 
 	// Register snowflake_version function
-	auto snowflake_version_function = ScalarFunction("snowflake_version", {}, LogicalType::VARCHAR, SnowflakeVersionScalarFun);
+	auto snowflake_version_function =
+	    ScalarFunction("snowflake_version", {}, LogicalType::VARCHAR, SnowflakeVersionScalarFun);
 	ExtensionUtil::RegisterFunction(instance, snowflake_version_function);
 
 	// Register the snowflake_store_credentials scalar function
@@ -50,6 +51,12 @@ static void LoadInternal(DatabaseInstance &instance) {
 	// Register snowflake_scan table function
 	auto snowflake_scan_function = GetSnowflakeScanFunction();
 	ExtensionUtil::RegisterFunction(instance, snowflake_scan_function);
+
+	// duckdb::snowflake::SnowflakeAttachFunction snowflake_attach_function;
+	// ExtensionUtil::RegisterFunction(instance, snowflake_attach_function);
+
+	auto &config = DBConfig::GetConfig(instance);
+	config.storage_extensions["snowflake"] = make_uniq<snowflake::SnowflakeStorageExtension>();
 }
 
 void SnowflakeExtension::Load(DuckDB &db) {

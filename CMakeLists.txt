@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.5)
 
 # Set extension name here
 set(TARGET_NAME snowflake)
+project(${TARGET_NAME})
+include_directories(src/include)
 
 # DuckDB's extension distribution supports vcpkg. As such, dependencies can be added in ./vcpkg.json and then
 # used in cmake with find_package. Feel free to remove or replace with other dependencies.
@@ -13,10 +15,7 @@ find_package(AdbcDriverManager CONFIG REQUIRED)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
-project(${TARGET_NAME})
-include_directories(src/include)
-
-set(EXTENSION_SOURCES 
+set(EXTENSION_SOURCES
     src/snowflake_extension.cpp
     src/snowflake_arrow_utils.cpp
     src/snowflake_secrets.cpp
@@ -26,10 +25,24 @@ set(EXTENSION_SOURCES
     src/snowflake_client_manager.cpp
     src/snowflake_config.cpp
     src/snowflake_functions.cpp
+    src/snowflake_types.cpp
+    src/snowflake_transaction.cpp
+    src/storage/snowflake_storage.cpp
+    src/storage/snowflake_catalog.cpp
+    src/storage/snowflake_catalog_set.cpp
+    src/storage/snowflake_schema_entry.cpp
+    src/storage/snowflake_schema_set.cpp
+    src/storage/snowflake_table_entry.cpp
+    src/storage/snowflake_table_set.cpp
 )
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      add_definitions(-DDEBUG_SNOWFLAKE)
+endif()
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
+set_property(TARGET ${LOADABLE_EXTENSION_NAME} PROPERTY "EXTENSION_VERSION_SCRIPT" "TRUE")
 
 # Define the Snowflake ADBC driver library path
 set(SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.so")
@@ -41,13 +54,23 @@ target_link_libraries(${EXTENSION_NAME}
     OpenSSL::Crypto
     Arrow::arrow_static
     AdbcDriverManager::adbc_driver_manager_static
+    ${CMAKE_DL_LIBS}
 )
 target_link_libraries(${LOADABLE_EXTENSION_NAME} 
     OpenSSL::SSL 
     OpenSSL::Crypto
     Arrow::arrow_static
     AdbcDriverManager::adbc_driver_manager_static
+    ${CMAKE_DL_LIBS}
 )
+
+# Link filesystem library if needed
+if(NOT APPLE)
+    target_link_libraries(${EXTENSION_NAME} stdc++fs)
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} stdc++fs)
+endif()
+
+# No RPATH configuration needed - using dynamic path resolution in code
 
 # Define path to Snowflake ADBC shared library for dynamic loading
 target_compile_definitions(${EXTENSION_NAME} PRIVATE 

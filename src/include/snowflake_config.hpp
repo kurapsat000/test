@@ -7,6 +7,7 @@ namespace snowflake {
 enum class SnowflakeAuthType { PASSWORD, OAUTH, KEY_PAIR };
 
 struct SnowflakeConfig {
+	std::string connection_string;
 	std::string account;
 	std::string username;
 	std::string password;
@@ -22,6 +23,8 @@ struct SnowflakeConfig {
 	bool use_high_precision = false; // When false, DECIMAL(p,0) converts to INT64
 
 	static SnowflakeConfig ParseConnectionString(const std::string &connection_string);
+
+	bool operator==(const SnowflakeConfig &other) const;
 };
 
 } // namespace snowflake
