@@ -1,3 +1,4 @@
+#include "snowflake_debug.hpp"
 #include "snowflake_arrow_utils.hpp"
 #include "duckdb/common/exception.hpp"
 
@@ -89,14 +90,6 @@ unique_ptr<ArrowArrayStreamWrapper> SnowflakeProduceArrowScan(uintptr_t factory_
 // It allows DuckDB to know the column types before actually executing the query
 void SnowflakeGetArrowSchema(ArrowArrayStream *factory_ptr, ArrowSchema &schema) {
 	auto factory = reinterpret_cast<SnowflakeArrowStreamFactory *>(factory_ptr);
-	factory->schema_call_count++;
-
-	DPRINT("SnowflakeGetArrowSchema CALL #%d: factory=%p, statement_initialized=%d, query='%s'\n",
-	       factory->schema_call_count, (void *)factory, factory->statement_initialized, factory->query.c_str());
-
-	if (factory->schema_call_count > 1) {
-		DPRINT("WARNING: GetArrowSchema called %d times on same factory!\n", factory->schema_call_count);
-	}
 
 	// Initialize statement if not already done
 	if (!factory->statement_initialized) {

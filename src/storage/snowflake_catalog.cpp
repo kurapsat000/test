@@ -1,3 +1,4 @@
+#include "snowflake_debug.hpp"
 #include "storage/snowflake_catalog.hpp"
 #include "storage/snowflake_schema_entry.hpp"
 #include "duckdb/storage/database_size.hpp"
@@ -8,11 +9,11 @@ namespace snowflake {
 SnowflakeCatalog::SnowflakeCatalog(AttachedDatabase &db_p, const SnowflakeConfig &config)
     : Catalog(db_p), client(SnowflakeClientManager::GetInstance().GetConnection(config.connection_string, config)),
       schemas(*this, client) {
-	fprintf(stderr, "[DEBUG] SnowflakeCatalog constructor called\n");
+	DPRINT("SnowflakeCatalog constructor called\n");
 	if (!client || !client->IsConnected()) {
 		throw ConnectionException("Failed to connect to Snowflake");
 	}
-	fprintf(stderr, "[DEBUG] SnowflakeCatalog connected successfully\n");
+	DPRINT("SnowflakeCatalog connected successfully\n");
 }
 
 SnowflakeCatalog::~SnowflakeCatalog() {
@@ -22,16 +23,16 @@ SnowflakeCatalog::~SnowflakeCatalog() {
 }
 
 void SnowflakeCatalog::Initialize(bool load_builtin) {
-	fprintf(stderr, "[DEBUG] SnowflakeCatalog::Initialize called with load_builtin=%s\n", load_builtin ? "true" : "false");
+	DPRINT("SnowflakeCatalog::Initialize called with load_builtin=%s\n", load_builtin ? "true" : "false");
 }
 
 void SnowflakeCatalog::ScanSchemas(ClientContext &context, std::function<void(SchemaCatalogEntry &)> callback) {
-	fprintf(stderr, "[DEBUG] SnowflakeCatalog::ScanSchemas called\n");
-	schemas.Scan(context, [&](CatalogEntry &schema) { 
-		fprintf(stderr, "[DEBUG] ScanSchemas callback for schema: %s\n", schema.name.c_str());
-		callback(schema.Cast<SchemaCatalogEntry>()); 
+	DPRINT("SnowflakeCatalog::ScanSchemas called\n");
+	schemas.Scan(context, [&](CatalogEntry &schema) {
+		DPRINT("ScanSchemas callback for schema: %s\n", schema.name.c_str());
+		callback(schema.Cast<SchemaCatalogEntry>());
 	});
-	fprintf(stderr, "[DEBUG] SnowflakeCatalog::ScanSchemas completed\n");
+	DPRINT("SnowflakeCatalog::ScanSchemas completed\n");
 }
 
 optional_ptr<SchemaCatalogEntry> SnowflakeCatalog::LookupSchema(CatalogTransaction transaction,

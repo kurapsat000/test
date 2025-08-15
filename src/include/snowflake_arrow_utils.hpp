@@ -13,7 +13,7 @@ namespace duckdb {
 // which expects a factory that can produce ArrowArrayStreamWrapper instances
 struct SnowflakeArrowStreamFactory {
 	// Snowflake connection managed by the client manager
-	std::shared_ptr<snowflake::SnowflakeClient> connection;
+	shared_ptr<snowflake::SnowflakeClient> connection;
 
 	// SQL query to execute
 	std::string query;
@@ -22,7 +22,7 @@ struct SnowflakeArrowStreamFactory {
 	AdbcStatement statement;
 	bool statement_initialized = false;
 
-	SnowflakeArrowStreamFactory(std::shared_ptr<snowflake::SnowflakeClient> conn, const std::string &query_str)
+	SnowflakeArrowStreamFactory(shared_ptr<snowflake::SnowflakeClient> conn, const std::string &query_str)
 	    : connection(conn), query(query_str) {
 		std::memset(&statement, 0, sizeof(statement));
 	}

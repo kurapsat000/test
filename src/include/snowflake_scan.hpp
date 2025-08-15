@@ -9,6 +9,7 @@ namespace snowflake {
 struct SnowflakeScanBindData : public ArrowScanFunctionData {
 	std::string connection_string;
 	std::string query;
+	std::string profile;
 	// The factory holds the ADBC connection and statement, keeping them alive during the scan
 	unique_ptr<SnowflakeArrowStreamFactory> factory;
 

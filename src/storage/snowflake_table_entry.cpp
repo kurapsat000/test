@@ -1,3 +1,4 @@
+#include "snowflake_debug.hpp"
 #include "storage/snowflake_table_entry.hpp"
 #include "snowflake_client_manager.hpp"
 #include "snowflake_scan.hpp"

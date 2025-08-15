@@ -1,3 +1,4 @@
+#include "snowflake_debug.hpp"
 #include "snowflake_client.hpp"
 #include "snowflake_types.hpp"
 
@@ -24,10 +25,8 @@ static std::string GetExtensionDirectory() {
 		std::filesystem::path extension_path(info.dli_fname);
 		std::string dir = extension_path.parent_path().string();
 
-#ifdef DEBUG
-		fprintf(stderr, "[DEBUG] GetExtensionDirectory: dli_fname = %s\n", info.dli_fname);
-		fprintf(stderr, "[DEBUG] GetExtensionDirectory: parent_path = %s\n", dir.c_str());
-#endif
+		DPRINT("GetExtensionDirectory: dli_fname = %s\n", info.dli_fname);
+		DPRINT("GetExtensionDirectory: parent_path = %s\n", dir.c_str());
 
 		return dir;
 	}
@@ -102,13 +101,11 @@ void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 		driver_path = SNOWFLAKE_ADBC_LIB;
 	}
 
-#ifdef DEBUG
-	fprintf(stderr, "[DEBUG] Snowflake ADBC Driver Loading:\n");
-	fprintf(stderr, "  Extension directory: %s\n", extension_dir.c_str());
-	fprintf(stderr, "  Looking for driver at: %s\n", adbc_path.string().c_str());
-	fprintf(stderr, "  Driver filename: %s\n", SNOWFLAKE_ADBC_LIB);
-	fprintf(stderr, "  Final driver path: %s\n", driver_path.c_str());
-#endif
+	DPRINT("Snowflake ADBC Driver Loading:\n");
+	DPRINT("Extension directory: %s\n", extension_dir.c_str());
+	DPRINT("Looking for driver at: %s\n", adbc_path.string().c_str());
+	DPRINT("Driver filename: %s\n", SNOWFLAKE_ADBC_LIB);
+	DPRINT("Final driver path: %s\n", driver_path.c_str());
 
 	status = AdbcDatabaseSetOption(&database, "driver", driver_path.c_str(), &error);
 	CheckError(status, "Failed to set Snowflake driver path", &error);
@@ -241,12 +238,11 @@ vector<string> SnowflakeClient::ListSchemas(ClientContext &context) {
 }
 
 vector<string> SnowflakeClient::ListTables(ClientContext &context, const string &schema = "") {
-	fprintf(stderr, "[DEBUG] ListTables called for schema: %s in database: %s\n", schema.c_str(),
-	        config.database.c_str());
+	DPRINT("ListTables called for schema: %s in database: %s\n", schema.c_str(), config.database.c_str());
 	const string upper_schema = StringUtil::Upper(schema);
 	const string table_name_query = "SELECT table_name FROM " + config.database + ".information_schema.tables" +
 	                                (schema != "" ? " WHERE table_schema = '" + upper_schema + "'" : "");
-	fprintf(stderr, "[DEBUG] Table query: %s\n", table_name_query.c_str());
+	DPRINT("Table query: %s\n", table_name_query.c_str());
 
 	auto result = ExecuteAndGetStrings(context, table_name_query, {"table_name"});
 	auto table_names = result[0];
@@ -255,9 +251,9 @@ vector<string> SnowflakeClient::ListTables(ClientContext &context, const string 
 		table_name = StringUtil::Lower(table_name);
 	}
 
-	fprintf(stderr, "[DEBUG] ListTables returning %zu tables\n", table_names.size());
+	DPRINT("ListTables returning %zu tables\n", table_names.size());
 	for (const auto &table_name : table_names) {
-		fprintf(stderr, "[DEBUG] Found table: %s\n", table_name.c_str());
+		DPRINT("Found table: %s\n", table_name.c_str());
 	}
 	return table_names;
 }
