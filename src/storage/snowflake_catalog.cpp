@@ -7,7 +7,7 @@ namespace duckdb {
 namespace snowflake {
 
 SnowflakeCatalog::SnowflakeCatalog(AttachedDatabase &db_p, const SnowflakeConfig &config)
-    : Catalog(db_p), client(SnowflakeClientManager::GetInstance().GetConnection(config.connection_string, config)),
+    : Catalog(db_p), client(SnowflakeClientManager::GetInstance().GetConnection(config)),
       schemas(*this, client) {
 	DPRINT("SnowflakeCatalog constructor called\n");
 	if (!client || !client->IsConnected()) {
@@ -19,7 +19,7 @@ SnowflakeCatalog::SnowflakeCatalog(AttachedDatabase &db_p, const SnowflakeConfig
 SnowflakeCatalog::~SnowflakeCatalog() {
 	// TODO consider adding option to allow connections to persist if user wants to DETACH and ATTACH multiple times
 	auto &client_manager = SnowflakeClientManager::GetInstance();
-	client_manager.ReleaseConnection(client->GetConfig().connection_string);
+	client_manager.ReleaseConnection(client->GetConfig());
 }
 
 void SnowflakeCatalog::Initialize(bool load_builtin) {
@@ -64,7 +64,9 @@ bool SnowflakeCatalog::InMemory() {
 }
 
 string SnowflakeCatalog::GetDBPath() {
-	return client->GetConfig().connection_string;
+	// Return a descriptive path for the Snowflake database
+	const auto &config = client->GetConfig();
+	return config.account + "." + config.database;
 }
 
 PhysicalOperator &SnowflakeCatalog::PlanCreateTableAs(ClientContext &context, PhysicalPlanGenerator &planner,

@@ -44,10 +44,10 @@ void SnowflakeSecretsHelper::StoreCredentials(ClientContext &context, const std:
 	SecretManager::Get(context).CreateSecret(context, input);
 }
 
-// Retrieve Snowflake credentials from a secret
-std::unordered_map<std::string, std::string> SnowflakeSecretsHelper::GetCredentials(ClientContext &context,
-                                                                                    const std::string &profile_name) {
-	std::unordered_map<std::string, std::string> credentials;
+// Retrieve Snowflake config from a secret
+snowflake::SnowflakeConfig SnowflakeSecretsHelper::GetCredentials(ClientContext &context,
+                                                                  const std::string &profile_name) {
+	snowflake::SnowflakeConfig config;
 
 	try {
 		auto &secret_manager = SecretManager::Get(context);
@@ -65,20 +65,19 @@ std::unordered_map<std::string, std::string> SnowflakeSecretsHelper::GetCredenti
 			throw InvalidInputException("Invalid secret type for profile: " + profile_name);
 		}
 
-		// Extract all the credential values using our custom methods
-		credentials["username"] = snowflake_secret->GetUser();
-		credentials["password"] = snowflake_secret->GetPassword();
-		credentials["account"] = snowflake_secret->GetAccount();
-		credentials["warehouse"] = snowflake_secret->GetWarehouse();
-		credentials["database"] = snowflake_secret->GetDatabase();
-		credentials["schema"] = snowflake_secret->GetSchema();
-		credentials["profile_name"] = profile_name;
+		// Extract all the credential values and build config
+		config.username = snowflake_secret->GetUser();
+		config.password = snowflake_secret->GetPassword();
+		config.account = snowflake_secret->GetAccount();
+		config.warehouse = snowflake_secret->GetWarehouse();
+		config.database = snowflake_secret->GetDatabase();
+		// Note: schema is not stored in SnowflakeConfig as per the struct definition
 
 	} catch (const std::exception &e) {
 		throw InvalidInputException("Failed to retrieve credentials for profile '" + profile_name + "': " + e.what());
 	}
 
-	return credentials;
+	return config;
 }
 
 // Delete a Snowflake credentials secret
@@ -128,28 +127,6 @@ std::vector<std::string> SnowflakeSecretsHelper::ListProfiles(ClientContext &con
 	return profiles;
 }
 
-// Build connection string from credentials
-std::string
-SnowflakeSecretsHelper::BuildConnectionString(const std::unordered_map<std::string, std::string> &credentials) {
-	std::ostringstream oss;
-
-	// Build the connection string in the format expected by Snowflake
-	oss << "account=" << credentials.at("account") << ";";
-	oss << "user=" << credentials.at("username") << ";";
-	oss << "password=" << credentials.at("password") << ";";
-	oss << "database=" << credentials.at("database") << ";";
-
-	// Add optional fields if they exist
-	if (credentials.find("warehouse") != credentials.end() && !credentials.at("warehouse").empty()) {
-		oss << "warehouse=" << credentials.at("warehouse") << ";";
-	}
-
-	if (credentials.find("schema") != credentials.end() && !credentials.at("schema").empty()) {
-		oss << "schema=" << credentials.at("schema") << ";";
-	}
-
-	return oss.str();
-}
 
 // Legacy implementation for backward compatibility
 std::string SnowflakeSecrets::StoreCredentials(const std::string &profile_name) {
@@ -176,13 +153,66 @@ bool SnowflakeSecrets::DeleteProfile(const std::string &profile_name) {
 bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const std::string &profile_name,
                                                  int timeout_seconds) {
 	try {
-		// Get credentials from secrets manager
-		auto credentials = GetCredentials(context, profile_name);
+		// Get config from secrets manager
+		auto config = GetCredentials(context, profile_name);
 
-		// Validate with the retrieved credentials
-		return ValidateCredentials(context, credentials["username"], credentials["password"], credentials["account"],
-		                           credentials["warehouse"], credentials["database"], credentials["schema"],
-		                           timeout_seconds);
+		// Use SnowflakeClientManager to validate
+		auto &client_manager = snowflake::SnowflakeClientManager::GetInstance();
+		
+		try {
+			// Try to get a connection - this will validate the credentials
+			auto connection = client_manager.GetConnection(config);
+			
+			// If we got here, connection succeeded - test with a simple query
+			AdbcStatement statement;
+			AdbcError error_obj;
+			std::memset(&error_obj, 0, sizeof(error_obj));
+			std::memset(&statement, 0, sizeof(statement));
+			
+			AdbcStatusCode status = AdbcStatementNew(connection->GetConnection(), &statement, &error_obj);
+			if (status != ADBC_STATUS_OK) {
+				if (error_obj.release) {
+					error_obj.release(&error_obj);
+				}
+				return false;
+			}
+
+			// Execute simple test query
+			status = AdbcStatementSetSqlQuery(&statement, "SELECT 1", &error_obj);
+			if (status != ADBC_STATUS_OK) {
+				AdbcStatementRelease(&statement, &error_obj);
+				if (error_obj.release) {
+					error_obj.release(&error_obj);
+				}
+				return false;
+			}
+
+			ArrowArrayStream stream;
+			std::memset(&stream, 0, sizeof(stream));
+			status = AdbcStatementExecuteQuery(&statement, &stream, nullptr, &error_obj);
+			bool success = (status == ADBC_STATUS_OK);
+			
+			// Clean up
+			if (stream.release) {
+				stream.release(&stream);
+			}
+			AdbcStatementRelease(&statement, &error_obj);
+			if (error_obj.release) {
+				error_obj.release(&error_obj);
+			}
+			
+			return success;
+		} catch (const IOException &inner_e) {
+			// Connection failed - this is expected for invalid credentials
+			fprintf(stderr, "[Snowflake Validation] Connection test failed for profile\n");
+			fprintf(stderr, "  Error: %s\n", inner_e.what());
+			return false;
+		} catch (const std::exception &inner_e) {
+			// Other connection failures
+			fprintf(stderr, "[Snowflake Validation] Unexpected error during connection test\n");
+			fprintf(stderr, "  Error: %s\n", inner_e.what());
+			return false;
+		}
 	} catch (const std::exception &e) {
 		// Log the error but don't throw
 		std::cerr << "Failed to validate credentials for profile '" << profile_name << "': " << e.what() << '\n';
@@ -196,26 +226,21 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
                                                  const std::string &warehouse, const std::string &database,
                                                  const std::string &schema, int timeout_seconds) {
 	try {
-		// Build connection string - same as what scan uses
-		std::unordered_map<std::string, std::string> creds;
-		creds["username"] = username;
-		creds["password"] = password;
-		creds["account"] = account;
-		creds["warehouse"] = warehouse;
-		creds["database"] = database;
-		creds["schema"] = schema;
-		
-		std::string connection_string = BuildConnectionString(creds);
-		
-		// Parse config and connect - exactly like scan does
-		auto config = snowflake::SnowflakeConfig::ParseConnectionString(connection_string);
+		// Build config directly
+		snowflake::SnowflakeConfig config;
+		config.username = username;
+		config.password = password;
+		config.account = account;
+		config.warehouse = warehouse;
+		config.database = database;
+		// Note: schema is not stored in SnowflakeConfig
 		
 		// Use SnowflakeClientManager like scan does
 		auto &client_manager = snowflake::SnowflakeClientManager::GetInstance();
 		
 		try {
 			// Try to get a connection - this will validate the credentials
-			auto connection = client_manager.GetConnection(connection_string, config);
+			auto connection = client_manager.GetConnection(config);
 			
 			// If we got here, connection succeeded
 			// Test with a simple query to be sure

@@ -14,16 +14,13 @@ class SnowflakeClientManager {
 public:
 	static SnowflakeClientManager &GetInstance();
 
-	shared_ptr<SnowflakeClient> GetConnection(const std::string &connection_string, const SnowflakeConfig &config);
+	shared_ptr<SnowflakeClient> GetConnection(const SnowflakeConfig &config);
 
-	// Convenience wrapper that does not require config
-	shared_ptr<SnowflakeClient> GetConnection(const std::string &connection_string);
-
-	void ReleaseConnection(const std::string &connection_string);
+	void ReleaseConnection(const SnowflakeConfig &config);
 
 private:
 	SnowflakeClientManager() = default;
-	std::unordered_map<std::string, shared_ptr<SnowflakeClient>> connections;
+	std::unordered_map<SnowflakeConfig, shared_ptr<SnowflakeClient>, SnowflakeConfigHash> connections;
 	std::mutex connection_mutex;
 };
 

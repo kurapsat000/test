@@ -154,11 +154,6 @@ void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 		CheckError(status, "Failed to set database", &error);
 	}
 
-	// if (!config.schema.empty()) {
-	// 	status = AdbcDatabaseSetOption(&database, "adbc.snowflake.sql.schema", config.schema.c_str(), &error);
-	// 	CheckError(status, "Failed to set schema", &error);
-	// }
-
 	if (!config.role.empty()) {
 		status = AdbcDatabaseSetOption(&database, "adbc.snowflake.sql.role", config.role.c_str(), &error);
 		CheckError(status, "Failed to set role", &error);

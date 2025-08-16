@@ -9,7 +9,6 @@ namespace snowflake {
 
 SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connection_string) {
 	SnowflakeConfig config;
-	config.connection_string = connection_string;
 
 	// Parse key=value pairs separated by semicolons
 	std::regex param_regex("([^=;]+)=([^;]*)");
@@ -65,8 +64,33 @@ SnowflakeConfig SnowflakeConfig::ParseConnectionString(const std::string &connec
 	return config;
 }
 
+std::string SnowflakeConfig::ToString() const {
+	std::ostringstream oss;
+	oss << "account=" << account << ";";
+	oss << "user=" << username << ";";
+	oss << "password=" << password << ";";
+	oss << "database=" << database << ";";
+	if (!warehouse.empty()) {
+		oss << "warehouse=" << warehouse << ";";
+	}
+	if (!role.empty()) {
+		oss << "role=" << role << ";";
+	}
+	if (auth_type == SnowflakeAuthType::OAUTH) {
+		oss << "auth_type=oauth;";
+		oss << "token=" << oauth_token << ";";
+	} else if (auth_type == SnowflakeAuthType::KEY_PAIR) {
+		oss << "auth_type=key_pair;";
+		oss << "private_key=" << private_key << ";";
+	}
+	oss << "query_timeout=" << query_timeout << ";";
+	oss << "keep_alive=" << (keep_alive ? "true" : "false") << ";";
+	oss << "use_high_precision=" << (use_high_precision ? "true" : "false") << ";";
+	return oss.str();
+}
+
 bool SnowflakeConfig::operator==(const SnowflakeConfig &other) const {
-	return (connection_string == other.connection_string && account == other.account && username == other.username &&
+	return (account == other.account && username == other.username &&
 	        password == other.password && warehouse == other.warehouse && database == other.database &&
 	        role == other.role && auth_type == other.auth_type && oauth_token == other.oauth_token &&
 	        private_key == other.private_key && query_timeout == other.query_timeout && keep_alive == other.keep_alive);

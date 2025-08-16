@@ -62,7 +62,6 @@ public:
 private:
 	shared_ptr<SnowflakeClient> client;
 	bool columns_loaded = false;
-	void EnsureColumnsLoaded(ClientContext &context);
 };
 } // namespace snowflake
 } // namespace duckdb

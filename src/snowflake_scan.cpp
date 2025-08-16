@@ -25,23 +25,20 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 	auto query = input.inputs[0].GetValue<string>();
 	auto profile = input.inputs[1].GetValue<string>();
 
-	// Get connection string from profile
-	std::unordered_map<std::string, std::string> credentials;
+	// Get config from profile
+	SnowflakeConfig config;
 	try {
-		credentials = SnowflakeSecretsHelper::GetCredentials(context, profile);
+		config = SnowflakeSecretsHelper::GetCredentials(context, profile);
 	} catch (const std::exception &e) {
 		throw BinderException("Failed to retrieve credentials for profile '%s': %s", profile.c_str(), e.what());
 	}
 
-	auto connection_string = SnowflakeSecretsHelper::BuildConnectionString(credentials);
-
-	// Parse connection and establish connection
+	// Get client manager
 	auto &client_manager = SnowflakeClientManager::GetInstance();
-	auto config = SnowflakeConfig::ParseConnectionString(connection_string);
 
 	shared_ptr<SnowflakeClient> connection;
 	try {
-		connection = client_manager.GetConnection(connection_string, config);
+		connection = client_manager.GetConnection(config);
 	} catch (const std::exception &e) {
 		throw BinderException("Unexpected error connecting to Snowflake with profile '%s': %s", profile.c_str(),
 		                      e.what());
@@ -54,9 +51,6 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 	// Create the bind data that inherits from ArrowScanFunctionData
 	// This allows us to use DuckDB's native Arrow scan implementation
 	auto bind_data = make_uniq<SnowflakeScanBindData>(std::move(factory));
-	bind_data->connection_string = connection_string;
-	bind_data->query = query;
-	bind_data->profile = profile;
 
 	// Get the schema from Snowflake using ADBC's ExecuteSchema
 	// This executes the query with schema-only mode to get column information

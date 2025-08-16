@@ -8,11 +8,10 @@ SnowflakeClientManager &SnowflakeClientManager::GetInstance() {
 	return instance;
 }
 
-shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std::string &connection_string,
-                                                                  const SnowflakeConfig &config) {
+shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const SnowflakeConfig &config) {
 	std::lock_guard<std::mutex> lock(connection_mutex);
 
-	auto it = connections.find(connection_string);
+	auto it = connections.find(config);
 	if (it != connections.end() && it->second->IsConnected()) {
 		return it->second;
 	}
@@ -21,18 +20,14 @@ shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std::str
 	auto connection = make_shared_ptr<SnowflakeClient>();
 	connection->Connect(config);
 
-	connections[connection_string] = connection;
+	connections[config] = connection;
 	return connection;
 }
 
-shared_ptr<SnowflakeClient> SnowflakeClientManager::GetConnection(const std::string &connection_string) {
-	auto config = SnowflakeConfig::ParseConnectionString(connection_string);
-	return this->GetConnection(connection_string, config);
-}
 
-void SnowflakeClientManager::ReleaseConnection(const std::string &connection_string) {
+void SnowflakeClientManager::ReleaseConnection(const SnowflakeConfig &config) {
 	std::lock_guard<std::mutex> lock(connection_mutex);
-	connections.erase(connection_string);
+	connections.erase(config);
 }
 
 } // namespace snowflake
