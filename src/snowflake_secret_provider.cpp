@@ -56,7 +56,7 @@ string SnowflakeSecret::GetSchema() const {
 
 //! Validate that all required fields are present
 void SnowflakeSecret::Validate() const {
-	vector<string> required_fields = {"user", "password", "account", "warehouse", "database", "schema"};
+	vector<string> required_fields = {"user", "password", "account", "database"};
 	vector<string> missing_fields;
 
 	for (const auto &field : required_fields) {
@@ -110,8 +110,10 @@ unique_ptr<BaseSecret> CreateSnowflakeSecret(ClientContext &context, CreateSecre
 	auto secret = make_uniq<SnowflakeSecret>(input.scope, input.provider, input.name);
 
 	// Extract Snowflake-specific parameters from the input options
-	vector<string> required_fields = {"user", "password", "account", "warehouse", "database", "schema"};
+	vector<string> required_fields = {"user", "password", "account", "database"};
+	vector<string> optional_fields = {"warehouse", "schema"};
 	
+	// Process required fields
 	for (const auto &field : required_fields) {
 		auto it = input.options.find(field);
 		if (it == input.options.end()) {
@@ -120,6 +122,14 @@ unique_ptr<BaseSecret> CreateSnowflakeSecret(ClientContext &context, CreateSecre
 		
 		// Store the value in the secret map
 		secret->secret_map[field] = it->second;
+	}
+	
+	// Process optional fields
+	for (const auto &field : optional_fields) {
+		auto it = input.options.find(field);
+		if (it != input.options.end()) {
+			secret->secret_map[field] = it->second;
+		}
 	}
 
 	// Validate the secret

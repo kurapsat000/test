@@ -23,16 +23,22 @@ Create a named profile to securely store your Snowflake credentials:
 CREATE SECRET snowflake_profile_main (
     TYPE snowflake,
     ACCOUNT 'your_account',
-    USERNAME 'your_username', 
+    USER 'your_username', 
     PASSWORD 'your_password',
     DATABASE 'your_database',
-    WAREHOUSE 'your_warehouse'
+    WAREHOUSE 'your_warehouse'  -- Optional but recommended for performance
 );
 ```
 
+Required parameters:
+- `ACCOUNT`: Snowflake account identifier
+- `USER`: Snowflake username
+- `PASSWORD`: User password
+- `DATABASE`: Default database name
+
 Optional parameters:
 - `WAREHOUSE`: Snowflake warehouse to use (recommended for performance)
-- `ROLE`: Snowflake role to assume
+- `SCHEMA`: Default schema name
 
 ### Method 2: Attach Database
 
@@ -45,10 +51,10 @@ You can attach a Snowflake database using either a profile/secret or a connectio
 CREATE SECRET my_snowflake_secret (
     TYPE snowflake,
     ACCOUNT 'your_account',
-    USERNAME 'your_username',
+    USER 'your_username',
     PASSWORD 'your_password',
     DATABASE 'your_database',
-    WAREHOUSE 'your_warehouse'
+    WAREHOUSE 'your_warehouse'  -- Optional
 );
 
 -- Attach using the secret (read-only mode is required)
@@ -140,10 +146,10 @@ DROP SECRET snowflake_profile_main;
 CREATE SECRET snowflake_profile_main (
     TYPE snowflake,
     ACCOUNT 'new_account',
-    USERNAME 'new_username',
+    USER 'new_username',
     PASSWORD 'new_password',
     DATABASE 'new_database',
-    WAREHOUSE 'new_warehouse'
+    WAREHOUSE 'new_warehouse'  -- Optional
 );
 ```
 
@@ -204,19 +210,19 @@ COPY (
 CREATE SECRET snowflake_dev (
     TYPE snowflake,
     ACCOUNT 'dev_account',
-    USERNAME 'dev_user',
+    USER 'dev_user',
     PASSWORD 'dev_password',
     DATABASE 'dev_db',
-    WAREHOUSE 'dev_warehouse'
+    WAREHOUSE 'dev_warehouse'  -- Optional
 );
 
 CREATE SECRET snowflake_prod (
     TYPE snowflake,
     ACCOUNT 'prod_account',
-    USERNAME 'prod_user',
+    USER 'prod_user',
     PASSWORD 'prod_password',
     DATABASE 'prod_db',
-    WAREHOUSE 'prod_warehouse'
+    WAREHOUSE 'prod_warehouse'  -- Optional
 );
 
 -- Option 1: Query using snowflake_scan with different profiles
