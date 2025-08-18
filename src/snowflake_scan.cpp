@@ -10,12 +10,14 @@
 #include "snowflake_config.hpp"
 #include "snowflake_secrets.hpp"
 #include <arrow-adbc/adbc.h>
+#include "snowflake_debug.hpp"
 
 namespace duckdb {
 namespace snowflake {
 
 static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableFunctionBindInput &input,
                                                   vector<LogicalType> &return_types, vector<string> &names) {
+	DPRINT("SnowflakeScanBind invoked\n");
 	// Validate parameters
 	if (input.inputs.size() < 2) {
 		throw BinderException("snowflake_scan requires at least 2 parameters: query and profile");
@@ -51,6 +53,8 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 	// Create the bind data that inherits from ArrowScanFunctionData
 	// This allows us to use DuckDB's native Arrow scan implementation
 	auto bind_data = make_uniq<SnowflakeScanBindData>(std::move(factory));
+	// TODO remove below line after implementing projection pushdown
+	bind_data->projection_pushdown_enabled = false;
 
 	// Get the schema from Snowflake using ADBC's ExecuteSchema
 	// This executes the query with schema-only mode to get column information
@@ -63,6 +67,7 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 	                                           bind_data->schema_root, names, return_types);
 	bind_data->all_types = return_types;
 
+	DPRINT("SnowflakeScanBind returning bind data\n");
 	return std::move(bind_data);
 }
 
@@ -79,9 +84,9 @@ TableFunction GetSnowflakeScanFunction() {
 	                             ArrowTableFunction::ArrowScanInitGlobal, // Use DuckDB's init
 	                             ArrowTableFunction::ArrowScanInitLocal); // Use DuckDB's init
 
-	// Enable projection and filter pushdown for optimization
-	snowflake_scan.projection_pushdown = true;
-	snowflake_scan.filter_pushdown = true;
+	// TODO Enable projection and filter pushdown for optimization
+	snowflake_scan.projection_pushdown = false;
+	snowflake_scan.filter_pushdown = false;
 
 	return snowflake_scan;
 }

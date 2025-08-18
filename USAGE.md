@@ -20,10 +20,10 @@ Create a named profile to securely store your Snowflake credentials:
 
 ```sql
 -- Create a Snowflake profile
-CREATE SECRET snowflake_profile_main (
+CREATE SECRET snowflake_profile (
     TYPE snowflake,
     ACCOUNT 'your_account',
-    USER 'your_username', 
+    USER 'your_username',
     PASSWORD 'your_password',
     DATABASE 'your_database',
     WAREHOUSE 'your_warehouse'  -- Optional but recommended for performance
@@ -31,12 +31,14 @@ CREATE SECRET snowflake_profile_main (
 ```
 
 Required parameters:
+
 - `ACCOUNT`: Snowflake account identifier
 - `USER`: Snowflake username
 - `PASSWORD`: User password
 - `DATABASE`: Default database name
 
 Optional parameters:
+
 - `WAREHOUSE`: Snowflake warehouse to use (recommended for performance)
 - `SCHEMA`: Default schema name
 
@@ -88,7 +90,7 @@ SELECT * FROM snowflake_scan(
 );
 
 -- Join Snowflake data with local DuckDB tables
-SELECT 
+SELECT
     s.customer_id,
     s.customer_name,
     l.total_orders
@@ -117,7 +119,7 @@ SELECT * FROM snow.public.customers LIMIT 10;
 SELECT * FROM snow.tpch_sf1.customer LIMIT 5;
 
 -- Create a local copy of Snowflake data
-CREATE TABLE local_customers AS 
+CREATE TABLE local_customers AS
 SELECT * FROM snow.public.customers;
 
 -- To query across multiple Snowflake databases, use snowflake_scan:
@@ -168,13 +170,13 @@ DROP SECRET snowflake_profile_main;
 SELECT * FROM snowflake_scan(
     '
     WITH monthly_sales AS (
-        SELECT 
+        SELECT
             DATE_TRUNC(''month'', order_date) as month,
             SUM(amount) as total_sales
         FROM orders
         GROUP BY 1
     )
-    SELECT 
+    SELECT
         month,
         total_sales,
         LAG(total_sales) OVER (ORDER BY month) as prev_month_sales
@@ -234,12 +236,12 @@ ATTACH '' AS dev_snow (TYPE snowflake, SECRET snowflake_dev, READ_ONLY);
 ATTACH '' AS prod_snow (TYPE snowflake, SECRET snowflake_prod, READ_ONLY);
 
 -- Compare data across environments
-SELECT 
-    'dev' as environment, COUNT(*) as user_count 
+SELECT
+    'dev' as environment, COUNT(*) as user_count
 FROM dev_snow.public.users
 UNION ALL
-SELECT 
-    'prod' as environment, COUNT(*) as user_count 
+SELECT
+    'prod' as environment, COUNT(*) as user_count
 FROM prod_snow.public.users;
 ```
 
@@ -262,6 +264,7 @@ SELECT * FROM snowflake_scan('SELECT 1', 'snowflake_profile_main');
 ### Permission Errors
 
 Ensure your Snowflake user has appropriate permissions:
+
 - `USAGE` on warehouse
 - `USAGE` on database
 - `SELECT` on tables/views
@@ -269,6 +272,7 @@ Ensure your Snowflake user has appropriate permissions:
 ### Type Compatibility
 
 The extension automatically maps Snowflake types to DuckDB types:
+
 - `VARCHAR` → `VARCHAR`
 - `NUMBER(p,0)` → Appropriate integer type based on precision
 - `NUMBER(p,s)` → `DECIMAL(p,s)`
@@ -289,7 +293,7 @@ The extension automatically maps Snowflake types to DuckDB types:
 ```sql
 -- Extract data from Snowflake, transform in DuckDB, load to local storage
 CREATE TEMPORARY TABLE staging_data AS
-SELECT 
+SELECT
     customer_id,
     order_date,
     amount * 1.1 as adjusted_amount  -- Apply business logic
@@ -300,7 +304,7 @@ FROM snowflake_scan(
 
 -- Further transformations
 CREATE TABLE final_report AS
-SELECT 
+SELECT
     DATE_TRUNC('week', order_date) as week,
     COUNT(DISTINCT customer_id) as unique_customers,
     SUM(adjusted_amount) as total_revenue
@@ -319,7 +323,7 @@ ATTACH '' AS snow (TYPE snowflake, SECRET snowflake_prod, READ_ONLY);
 ATTACH 'local.db' AS local_db;
 
 -- Analyze across databases
-SELECT 
+SELECT
     s.product_category,
     COUNT(DISTINCT l.customer_id) as local_customers,
     SUM(s.revenue) as snowflake_revenue
@@ -337,6 +341,7 @@ GROUP BY 1;
 ## Support
 
 For issues or questions:
+
 - Check the [GitHub repository](https://github.com/your-repo/duckdb-snowflake)
 - Review Snowflake ADBC driver documentation
 - Ensure you have the latest version of the extension

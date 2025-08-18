@@ -26,6 +26,8 @@ TableFunction SnowflakeTableEntry::GetScanFunction(ClientContext &context, uniqu
 	DPRINT("SnowflakeTableEntry: Created factory at %p\n", (void *)factory.get());
 
 	auto snowflake_bind_data = make_uniq<SnowflakeScanBindData>(std::move(factory));
+	// TODO remove below line after implementing projection pushdown
+	snowflake_bind_data->projection_pushdown_enabled = false;
 
 	DPRINT("SnowflakeTableEntry: About to call SnowflakeGetArrowSchema\n");
 	SnowflakeGetArrowSchema(reinterpret_cast<ArrowArrayStream *>(snowflake_bind_data->factory.get()),
@@ -66,7 +68,6 @@ TableStorageInfo SnowflakeTableEntry::GetStorageInfo(ClientContext &context) {
 	result.index_info = vector<IndexInfo>();
 	return result;
 }
-
 
 } // namespace snowflake
 } // namespace duckdb
