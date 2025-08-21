@@ -45,7 +45,13 @@ build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 set_property(TARGET ${LOADABLE_EXTENSION_NAME} PROPERTY "EXTENSION_VERSION_SCRIPT" "TRUE")
 
 # Define the Snowflake ADBC driver library path
-set(SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.so")
+if(WIN32)
+    set(SNOWFLAKE_ADBC_LIB "adbc_driver_snowflake.dll")
+elseif(APPLE)
+    set(SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.dylib")
+else()
+    set(SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.so")
+endif()
 
 # Link dependencies in both the static library and the loadable extension
 # Note: Snowflake ADBC driver will be loaded dynamically to avoid symbol conflicts
