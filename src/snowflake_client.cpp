@@ -11,13 +11,7 @@
 #include <filesystem>
 
 #ifndef SNOWFLAKE_ADBC_LIB
-#if defined(_WIN32)
-#define SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.dll"
-#elif defined(__APPLE__)
-#define SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.dylib"
-#else
 #define SNOWFLAKE_ADBC_LIB "libadbc_driver_snowflake.so"
-#endif
 #endif
 
 namespace duckdb {
