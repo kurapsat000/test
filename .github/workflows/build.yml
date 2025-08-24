@@ -33,10 +33,15 @@ jobs:
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
+      - name: Setup vcpkg manually
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          git checkout master
+          ./bootstrap-vcpkg.sh
+          cd ..
+          echo "VCPKG setup complete"
+          ls -la vcpkg/scripts/buildsystems/
 
       - name: Build
         env:
@@ -44,4 +49,5 @@ jobs:
           VCPKG_TARGET_TRIPLET: ${{ matrix.os == 'ubuntu-latest' && 'x64-linux' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-windows-static-md' }}
           VCPKG_MANIFEST_DIR: ${{ github.workspace }}
           GEN: ${{ matrix.os == 'windows-latest' && '' || 'ninja' }}
+          VCPKG_FEATURE_FLAGS: manifests
         run: make release-snowflake 
