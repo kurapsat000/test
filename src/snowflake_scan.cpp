@@ -30,9 +30,17 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 		auto param2 = input.inputs[1].GetValue<string>();
 
 		// Check if param1 looks like a connection string (contains 'account=' or 'user=')
-		if (param1.find("account=") != string::npos || param1.find("user=") != string::npos) {
+		// Also check if param1 is empty or invalid - in that case, treat as connection string pattern
+		if (param1.empty() || param1.find("account=") != string::npos || param1.find("user=") != string::npos) {
 			// Pattern 1: (connection_string, query)
-			config = SnowflakeConfig::ParseConnectionString(param1);
+			if (param1.empty()) {
+				throw BinderException("Snowflake connection string missing required 'account' parameter");
+			}
+			try {
+				config = SnowflakeConfig::ParseConnectionString(param1);
+			} catch (const std::exception &e) {
+				throw BinderException("Failed to bind snowflake_scan: {\"exception_type\":\"Invalid Input\",\"exception_message\":\"%s\"}", e.what());
+			}
 			query = param2;
 		} else {
 			// Pattern 2: (query, profile)
