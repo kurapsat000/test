@@ -11,12 +11,12 @@ concurrency:
 jobs:
   linux:
     name: Linux
-    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
+    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' || github.repository == 'kurapsat000/test' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         # Add commits/tags to build against other DuckDB versions
-        duckdb_version: [ '<submodule_version>' ]
+        duckdb_version: [ 'v1.3.1' ]
     env:
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
       VCPKG_TARGET_TRIPLET: 'x64-linux'
@@ -37,7 +37,6 @@ jobs:
           submodules: 'true'
 
       - name: Checkout DuckDB to version
-        if: ${{ matrix.duckdb_version != '<submodule_version>'}}
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
@@ -48,12 +47,13 @@ jobs:
           vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Rename extension
+        if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
         run: |
           python3 scripts/bootstrap-template.py ext_1_a_123b_b11
 
       - name: Build
         run: |
-          make
+          make release-snowflake
 
       - name: Test
         run: |
@@ -61,12 +61,12 @@ jobs:
 
   macos:
     name: MacOS
-    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
+    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' || github.repository == 'kurapsat000/test' }}
     runs-on: macos-latest
     strategy:
       matrix:
         # Add commits/tags to build against other DuckDB versions
-        duckdb_version: [ '<submodule_version>']
+        duckdb_version: [ 'v1.3.1']
     env:
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
       VCPKG_TARGET_TRIPLET: 'x64-osx'
@@ -90,7 +90,6 @@ jobs:
           python-version: '3.11'
 
       - name: Checkout DuckDB to version
-        if: ${{ matrix.duckdb_version != '<submodule_version>'}}
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
@@ -101,12 +100,13 @@ jobs:
           vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Rename extension
+        if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
         run: |
           python scripts/bootstrap-template.py ext_1_a_123b_b11
 
       - name: Build
         run: |
-          make
+          make release-snowflake
 
       - name: Test
         run: |
@@ -114,12 +114,12 @@ jobs:
 
   windows:
     name: Windows
-    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
+    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' || github.repository == 'kurapsat000/test' }}
     runs-on: windows-latest
     strategy:
       matrix:
         # Add commits/tags to build against other DuckDB versions
-        duckdb_version: [ '<submodule_version>' ]
+        duckdb_version: [ 'v1.3.1' ]
     env:
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
       VCPKG_TARGET_TRIPLET: 'x64-windows-static-md'
@@ -138,8 +138,6 @@ jobs:
           python-version: '3.11'
 
       - name: Checkout DuckDB to version
-        # Add commits/tags to build against other DuckDB versions
-        if: ${{ matrix.duckdb_version != '<submodule_version>'}}
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
@@ -150,12 +148,13 @@ jobs:
           vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Rename extension
+        if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
         run: |
           python scripts/bootstrap-template.py ext_1_a_123b_b11
 
       - name: Build
         run: |
-          make
+          make release-snowflake
 
       - name: Test extension
         run: |
