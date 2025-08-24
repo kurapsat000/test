@@ -9,8 +9,8 @@ include_directories(src/include)
 # used in cmake with find_package. Feel free to remove or replace with other dependencies.
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
 find_package(OpenSSL REQUIRED)
-find_package(Arrow CONFIG REQUIRED)
-find_package(AdbcDriverManager CONFIG REQUIRED)
+# find_package(Arrow CONFIG REQUIRED)
+# find_package(AdbcDriverManager CONFIG REQUIRED)
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
@@ -58,15 +58,15 @@ endif()
 target_link_libraries(${EXTENSION_NAME} 
     OpenSSL::SSL 
     OpenSSL::Crypto
-    Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
+    # Arrow::arrow_static
+    # AdbcDriverManager::adbc_driver_manager_static
     ${CMAKE_DL_LIBS}
 )
 target_link_libraries(${LOADABLE_EXTENSION_NAME} 
     OpenSSL::SSL 
     OpenSSL::Crypto
-    Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
+    # Arrow::arrow_static
+    # AdbcDriverManager::adbc_driver_manager_static
     ${CMAKE_DL_LIBS}
 )
 
