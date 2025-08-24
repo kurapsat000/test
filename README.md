@@ -45,6 +45,7 @@ Now we can use the features from the extension directly in DuckDB. The extension
 ### Basic Functions
 - `snowflake(name)` - Returns a greeting with the provided name
 - `snowflake_openssl_version(name)` - Returns a greeting with OpenSSL version information
+- `snowflake_adbc_version(name)` - Returns a greeting with ADBC version and driver status
 
 ### Example Usage
 ```sql
@@ -64,6 +65,15 @@ SELECT snowflake_openssl_version('Michael') as result;
 │                          varchar                            │
 ├─────────────────────────────────────────────────────────────┤
 │ Snowflake Michael, my linked OpenSSL version is OpenSSL... │
+└─────────────────────────────────────────────────────────────┘
+
+-- Function with ADBC version
+SELECT snowflake_adbc_version('Test') as result;
+┌─────────────────────────────────────────────────────────────┐
+│                           result                            │
+│                          varchar                            │
+├─────────────────────────────────────────────────────────────┤
+│ Snowflake Test - ADBC Available - Driver Found             │
 └─────────────────────────────────────────────────────────────┘
 ```
 

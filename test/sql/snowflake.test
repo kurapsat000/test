@@ -27,3 +27,9 @@ query I
 SELECT snowflake('ADBC Test') LIKE '%ADBC%';
 ----
 true
+
+# Test ADBC version function
+query I
+SELECT snowflake_adbc_version('Test') LIKE '%ADBC%';
+----
+true
