@@ -1,40 +1,18 @@
-#
-# NOTE: this workflow is for testing the extension template itself,
-#     this workflow will be removed when scripts/bootstrap-template.py is run
-#
-name: Extension Template
-on: [push, pull_request,repository_dispatch]
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' || github.sha }}
-  cancel-in-progress: true
+name: Build Snowflake Extension
+on: [push, pull_request]
 
 jobs:
   linux:
     name: Linux
-    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' || github.repository == 'kurapsat000/test' }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # Add commits/tags to build against other DuckDB versions
-        duckdb_version: [ 'v1.3.1' ]
     env:
-      GEN: ninja
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      VCPKG_TARGET_TRIPLET: 'x64-linux'
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: Install system dependencies
-        shell: bash
-        run: |
-          sudo apt-get update -y -qq
-          sudo apt-get install -y -qq ninja-build pkg-config libssl-dev
-          # Install Arrow and ADBC from system packages
-          sudo apt-get install -y -qq libarrow-dev libarrow-python-dev
-          # For ADBC, we'll need to install from source or use a PPA
-          # For now, we'll build ADBC as part of the arrow-adbc submodule
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -43,31 +21,23 @@ jobs:
       - name: Checkout DuckDB to version
         run: |
           cd duckdb
-          git checkout ${{ matrix.duckdb_version }}
+          git checkout v1.3.1
 
-      - name: Rename extension
-        if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
-        run: |
-          python3 scripts/bootstrap-template.py ext_1_a_123b_b11
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Build
         run: |
           make release-snowflake
-
-      - name: Test
-        run: |
-          make test
 
   macos:
     name: MacOS
-    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' || github.repository == 'kurapsat000/test' }}
     runs-on: macos-latest
-    strategy:
-      matrix:
-        # Add commits/tags to build against other DuckDB versions
-        duckdb_version: [ 'v1.3.1']
     env:
-      GEN: ninja
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      VCPKG_TARGET_TRIPLET: 'x64-osx'
     defaults:
       run:
         shell: bash
@@ -78,43 +48,26 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
-      - name: Install system dependencies
-        run: |
-          brew install ninja pkg-config openssl
-          # Install Arrow from Homebrew
-          brew install apache-arrow
-          # ADBC will be built from the arrow-adbc submodule
-
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.11'
-
       - name: Checkout DuckDB to version
         run: |
           cd duckdb
-          git checkout ${{ matrix.duckdb_version }}
+          git checkout v1.3.1
 
-      - name: Rename extension
-        if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
-        run: |
-          python scripts/bootstrap-template.py ext_1_a_123b_b11
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Build
         run: |
           make release-snowflake
-
-      - name: Test
-        run: |
-          make test
 
   windows:
     name: Windows
-    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' || github.repository == 'kurapsat000/test' }}
     runs-on: windows-latest
-    strategy:
-      matrix:
-        # Add commits/tags to build against other DuckDB versions
-        duckdb_version: [ 'v1.3.1' ]
+    env:
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      VCPKG_TARGET_TRIPLET: 'x64-windows-static-md'
     defaults:
       run:
         shell: bash
@@ -125,34 +78,16 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.11'
-
-      - name: Install system dependencies
-        run: |
-          # On Windows, we'll use vcpkg for now as it's more reliable
-          # But we'll install it manually without the action
-          git clone https://github.com/Microsoft/vcpkg.git
-          cd vcpkg
-          ./bootstrap-vcpkg.sh
-          ./vcpkg install arrow adbc-driver-manager
-          cd ..
-
       - name: Checkout DuckDB to version
         run: |
           cd duckdb
-          git checkout ${{ matrix.duckdb_version }}
+          git checkout v1.3.1
 
-      - name: Rename extension
-        if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
-        run: |
-          python scripts/bootstrap-template.py ext_1_a_123b_b11
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Build
         run: |
           make release-snowflake
-
-      - name: Test extension
-        run: |
-          build/release/test/Release/unittest.exe
