@@ -10,7 +10,15 @@ include_directories(src/include)
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
 find_package(OpenSSL REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
-find_package(AdbcDriverManager CONFIG REQUIRED)
+
+# AdbcDriverManager is not available on Windows, so make it optional
+find_package(AdbcDriverManager CONFIG)
+if(AdbcDriverManager_FOUND)
+    set(ADBC_AVAILABLE TRUE)
+else()
+    set(ADBC_AVAILABLE FALSE)
+    message(WARNING "AdbcDriverManager not found - Snowflake functionality will be limited")
+endif()
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
@@ -55,20 +63,35 @@ endif()
 
 # Link dependencies in both the static library and the loadable extension
 # Note: Snowflake ADBC driver will be loaded dynamically to avoid symbol conflicts
-target_link_libraries(${EXTENSION_NAME} 
-    OpenSSL::SSL 
-    OpenSSL::Crypto
-    Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
-    ${CMAKE_DL_LIBS}
-)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} 
-    OpenSSL::SSL 
-    OpenSSL::Crypto
-    Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
-    ${CMAKE_DL_LIBS}
-)
+if(ADBC_AVAILABLE)
+    target_link_libraries(${EXTENSION_NAME} 
+        OpenSSL::SSL 
+        OpenSSL::Crypto
+        Arrow::arrow_static
+        AdbcDriverManager::adbc_driver_manager_static
+        ${CMAKE_DL_LIBS}
+    )
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} 
+        OpenSSL::SSL 
+        OpenSSL::Crypto
+        Arrow::arrow_static
+        AdbcDriverManager::adbc_driver_manager_static
+        ${CMAKE_DL_LIBS}
+    )
+else()
+    target_link_libraries(${EXTENSION_NAME} 
+        OpenSSL::SSL 
+        OpenSSL::Crypto
+        Arrow::arrow_static
+        ${CMAKE_DL_LIBS}
+    )
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} 
+        OpenSSL::SSL 
+        OpenSSL::Crypto
+        Arrow::arrow_static
+        ${CMAKE_DL_LIBS}
+    )
+endif()
 
 # Link filesystem library if needed
 if(NOT APPLE)
@@ -85,6 +108,15 @@ target_compile_definitions(${EXTENSION_NAME} PRIVATE
 target_compile_definitions(${LOADABLE_EXTENSION_NAME} PRIVATE 
     -DSNOWFLAKE_ADBC_LIB="${SNOWFLAKE_ADBC_LIB}"
 )
+
+# Add ADBC availability flag
+if(ADBC_AVAILABLE)
+    target_compile_definitions(${EXTENSION_NAME} PRIVATE -DADBC_AVAILABLE=1)
+    target_compile_definitions(${LOADABLE_EXTENSION_NAME} PRIVATE -DADBC_AVAILABLE=1)
+else()
+    target_compile_definitions(${EXTENSION_NAME} PRIVATE -DADBC_AVAILABLE=0)
+    target_compile_definitions(${LOADABLE_EXTENSION_NAME} PRIVATE -DADBC_AVAILABLE=0)
+endif()
 
 install(
   TARGETS ${EXTENSION_NAME}
