@@ -1,10 +1,10 @@
-# Quack
+# Snowflake
 
 This repository is based on https://github.com/duckdb/extension-template, check it out if you want to build and ship your own DuckDB extension.
 
 ---
 
-This extension, Quack, allow you to ... <extension_goal>.
+This extension, Snowflake, enables DuckDB to connect to and query Snowflake data sources using the Arrow Database Connectivity (ADBC) interface. It provides seamless integration between DuckDB and Snowflake, allowing you to execute SQL queries against Snowflake databases directly from DuckDB.
 
 
 ## Building
@@ -22,29 +22,56 @@ Now to build the extension, run:
 ```sh
 make
 ```
+
+For building with ADBC driver support:
+```sh
+make release-snowflake
+```
 The main binaries that will be built are:
 ```sh
 ./build/release/duckdb
 ./build/release/test/unittest
-./build/release/extension/quack/quack.duckdb_extension
+./build/release/extension/snowflake/snowflake.duckdb_extension
 ```
 - `duckdb` is the binary for the duckdb shell with the extension code automatically loaded.
 - `unittest` is the test runner of duckdb. Again, the extension is already linked into the binary.
-- `quack.duckdb_extension` is the loadable binary as it would be distributed.
+- `snowflake.duckdb_extension` is the loadable binary as it would be distributed.
 
 ## Running the extension
 To run the extension code, simply start the shell with `./build/release/duckdb`.
 
-Now we can use the features from the extension directly in DuckDB. The template contains a single scalar function `quack()` that takes a string arguments and returns a string:
-```
-D select quack('Jane') as result;
+Now we can use the features from the extension directly in DuckDB. The extension provides several functions:
+
+### Basic Functions
+- `snowflake(name)` - Returns a greeting with the provided name
+- `snowflake_openssl_version(name)` - Returns a greeting with OpenSSL version information
+
+### Example Usage
+```sql
+-- Basic function
+SELECT snowflake('Jane') as result;
 ┌───────────────┐
 │    result     │
 │    varchar    │
 ├───────────────┤
-│ Quack Jane 🐥 │
+│ Snowflake Jane 🐥 │
 └───────────────┘
+
+-- Function with OpenSSL version
+SELECT snowflake_openssl_version('Michael') as result;
+┌─────────────────────────────────────────────────────────────┐
+│                           result                            │
+│                          varchar                            │
+├─────────────────────────────────────────────────────────────┤
+│ Snowflake Michael, my linked OpenSSL version is OpenSSL... │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+### ADBC Integration
+The extension includes Arrow Database Connectivity (ADBC) integration for connecting to Snowflake. This functionality is currently in development and will provide:
+- Direct connection to Snowflake databases
+- SQL query execution against Snowflake
+- Data transfer between DuckDB and Snowflake
 
 ## Running the tests
 Different tests can be created for DuckDB extensions. The primary way of testing DuckDB extensions should be the SQL tests in `./test/sql`. These SQL tests can be run using:
@@ -81,6 +108,6 @@ DuckDB. To specify a specific version, you can pass the version instead.
 
 After running these steps, you can install and load your extension using the regular INSTALL/LOAD commands in DuckDB:
 ```sql
-INSTALL quack
-LOAD quack
+INSTALL snowflake
+LOAD snowflake
 ```

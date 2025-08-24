@@ -1,0 +1,29 @@
+{
+  "adbc_dependencies": {
+    "linux_amd64": ["go", "cmake", "ninja"],
+    "linux_arm64": ["go", "cmake", "ninja"],
+    "osx_amd64": ["go", "cmake", "ninja"],
+    "osx_arm64": ["go", "cmake", "ninja"],
+    "windows_amd64": ["go", "cmake", "ninja"],
+    "wasm_mvp": ["go", "cmake", "ninja"],
+    "wasm_eh": ["go", "cmake", "ninja"],
+    "wasm_threads": ["go", "cmake", "ninja"]
+  },
+  "build_steps": {
+    "pre_build": [
+      "git submodule update --init --recursive",
+      "cd adbc && git checkout main && git pull origin main"
+    ],
+    "build_adbc": [
+      "mkdir -p build/adbc",
+      "cd build/adbc",
+      "cmake -DADBC_DRIVER_SNOWFLAKE=ON -DADBC_BUILD_SHARED=OFF -DADBC_BUILD_STATIC=ON -DCMAKE_BUILD_TYPE=Release ../../adbc/c/driver_manager",
+      "make -j$(nproc)"
+    ]
+  },
+  "environment_variables": {
+    "ADBC_AVAILABLE": "1",
+    "GO_PATH": "/usr/local/go/bin",
+    "CMAKE_PREFIX_PATH": "${CMAKE_PREFIX_PATH}:${PROJ_DIR}/build/adbc"
+  }
+} 
