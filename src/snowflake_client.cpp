@@ -90,11 +90,11 @@ void SnowflakeClient::InitializeDatabase(const SnowflakeConfig &config) {
 	// Use ADBC driver manager to load the Snowflake driver
 	// Try to load from the same directory as the extension first
 	std::string extension_dir = GetExtensionDirectory();
-	std::filesystem::path adbc_path = std::filesystem::path(extension_dir) / SNOWFLAKE_ADBC_LIB;
+	std::__fs::filesystem::path adbc_path = std::__fs::filesystem::path(extension_dir) / SNOWFLAKE_ADBC_LIB;
 
 	// Check if the library exists in the extension directory
 	std::string driver_path;
-	if (std::filesystem::exists(adbc_path)) {
+	if (std::__fs::filesystem::exists(adbc_path)) {
 		driver_path = adbc_path.string();
 	} else {
 		// Try just the filename - let the system search for it
