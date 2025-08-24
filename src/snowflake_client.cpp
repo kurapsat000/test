@@ -22,7 +22,7 @@ static std::string GetExtensionDirectory() {
 	Dl_info info;
 	// Use a function from this library to get its path
 	if (dladdr(reinterpret_cast<void *>(&GetExtensionDirectory), &info)) {
-		std::filesystem::path extension_path(info.dli_fname);
+		std::__fs::filesystem::path extension_path(info.dli_fname);
 		std::string dir = extension_path.parent_path().string();
 
 		DPRINT("GetExtensionDirectory: dli_fname = %s\n", info.dli_fname);
