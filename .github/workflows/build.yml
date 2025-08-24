@@ -20,12 +20,12 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update -y -qq
-          sudo apt-get install -y -qq ninja-build build-essential cmake
+          sudo apt-get install -y -qq build-essential cmake
 
       - name: Install Build Tools (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install ninja cmake
+          brew install cmake
 
       - name: Install Build Tools (Windows)
         if: matrix.os == 'windows-latest'
@@ -35,8 +35,8 @@ jobs:
         run: |
           echo "CMake version:"
           cmake --version
-          echo "Ninja version:"
-          ninja --version || echo "Ninja not available (Windows)"
+          echo "Make version:"
+          make --version || echo "Make not available"
           echo "Compiler:"
           gcc --version || clang --version || echo "No gcc/clang found"
 
@@ -62,6 +62,4 @@ jobs:
           VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
           VCPKG_TARGET_TRIPLET: ${{ matrix.os == 'ubuntu-latest' && 'x64-linux' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-windows-static-md' }}
           VCPKG_MANIFEST_DIR: ${{ github.workspace }}
-          GEN: ${{ matrix.os == 'windows-latest' && '' || 'ninja' }}
-          CMAKE_GENERATOR: ${{ matrix.os == 'windows-latest' && 'Visual Studio 17 2022' || 'Ninja' }}
         run: make release-snowflake 
