@@ -18,30 +18,44 @@ jobs:
 
       - name: Install Build Tools (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install -y -qq ninja-build build-essential cmake
 
       - name: Install Build Tools (macOS)
         if: matrix.os == 'macos-latest'
-        run: brew install ninja
+        run: |
+          brew install ninja cmake
 
       - name: Install Build Tools (Windows)
         if: matrix.os == 'windows-latest'
         uses: microsoft/setup-msbuild@v1.3.1
+
+      - name: Check Build Tools
+        run: |
+          echo "CMake version:"
+          cmake --version
+          echo "Ninja version:"
+          ninja --version || echo "Ninja not available (Windows)"
+          echo "Compiler:"
+          gcc --version || clang --version || echo "No gcc/clang found"
 
       - name: Checkout DuckDB
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
 
-      - name: Setup vcpkg manually
+      - name: Setup vcpkg
         run: |
           git clone https://github.com/Microsoft/vcpkg.git
           cd vcpkg
-          git checkout master
+          git checkout 2024.12.12
           ./bootstrap-vcpkg.sh
           cd ..
-          echo "VCPKG setup complete"
-          ls -la vcpkg/scripts/buildsystems/
+
+      - name: Install Dependencies
+        run: |
+          ./vcpkg/vcpkg install openssl arrow arrow-adbc[snowflake] --triplet=${{ matrix.os == 'ubuntu-latest' && 'x64-linux' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-windows-static-md' }}
 
       - name: Build
         env:
@@ -49,5 +63,5 @@ jobs:
           VCPKG_TARGET_TRIPLET: ${{ matrix.os == 'ubuntu-latest' && 'x64-linux' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-windows-static-md' }}
           VCPKG_MANIFEST_DIR: ${{ github.workspace }}
           GEN: ${{ matrix.os == 'windows-latest' && '' || 'ninja' }}
-          VCPKG_FEATURE_FLAGS: manifests
+          CMAKE_GENERATOR: ${{ matrix.os == 'windows-latest' && 'Visual Studio 17 2022' || 'Ninja' }}
         run: make release-snowflake 
