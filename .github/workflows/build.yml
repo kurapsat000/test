@@ -2,64 +2,131 @@ name: Build Snowflake Extension
 on: [push, pull_request]
 
 jobs:
-  build:
-    name: Build
-    runs-on: ${{ matrix.os }}
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
         duckdb_version: ['v1.3.1']
+    env:
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      VCPKG_TARGET_TRIPLET: 'x64-linux'
+      GEN: ninja
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Install Ninja
+        shell: bash
+        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build
+
+      - uses: actions/checkout@v4
         with:
-          submodules: true
+          fetch-depth: 0
+          submodules: 'true'
 
-      - name: Install Build Tools (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update -y -qq
-          sudo apt-get install -y -qq build-essential cmake
-
-      - name: Install Build Tools (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install cmake
-
-      - name: Install Build Tools (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: microsoft/setup-msbuild@v1.3.1
-
-      - name: Check Build Tools
-        run: |
-          echo "CMake version:"
-          cmake --version
-          echo "Make version:"
-          make --version || echo "Make not available"
-          echo "Compiler:"
-          gcc --version || clang --version || echo "No gcc/clang found"
-
-      - name: Checkout DuckDB
+      - name: Checkout DuckDB to version
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
 
       - name: Setup vcpkg
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git
-          cd vcpkg
-          git checkout 2024.12.12
-          ./bootstrap-vcpkg.sh
-          cd ..
-
-      - name: Install Dependencies
-        run: |
-          ./vcpkg/vcpkg install openssl arrow arrow-adbc[snowflake] --triplet=${{ matrix.os == 'ubuntu-latest' && 'x64-linux' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-windows-static-md' }}
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Build
-        env:
-          VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-          VCPKG_TARGET_TRIPLET: ${{ matrix.os == 'ubuntu-latest' && 'x64-linux' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-windows-static-md' }}
-          VCPKG_MANIFEST_DIR: ${{ github.workspace }}
-        run: make release-snowflake 
+        run: |
+          make release-snowflake
+
+      - name: Test
+        run: |
+          make test
+
+  macos:
+    name: MacOS
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        duckdb_version: ['v1.3.1']
+    env:
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      VCPKG_TARGET_TRIPLET: 'x64-osx'
+      OSX_BUILD_ARCH: 'x86_64'
+      GEN: ninja
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+
+      - name: Checkout DuckDB to version
+        run: |
+          cd duckdb
+          git checkout ${{ matrix.duckdb_version }}
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
+
+      - name: Build
+        run: |
+          make release-snowflake
+
+      - name: Test
+        run: |
+          make test
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        duckdb_version: ['v1.3.1']
+    env:
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      VCPKG_TARGET_TRIPLET: 'x64-windows-static-md'
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+
+      - name: Checkout DuckDB to version
+        run: |
+          cd duckdb
+          git checkout ${{ matrix.duckdb_version }}
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
+
+      - name: Build
+        run: |
+          make release-snowflake
+
+      - name: Test extension
+        run: |
+          build/release/test/Release/unittest.exe 
