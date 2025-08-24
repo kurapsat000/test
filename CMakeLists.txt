@@ -5,12 +5,41 @@ set(TARGET_NAME snowflake)
 project(${TARGET_NAME})
 include_directories(src/include)
 
-# DuckDB's extension distribution supports vcpkg. As such, dependencies can be added in ./vcpkg.json and then
-# used in cmake with find_package. Feel free to remove or replace with other dependencies.
-# Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
+# Set C++17 standard for std::filesystem support
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Use system packages instead of vcpkg for better CI compatibility
 find_package(OpenSSL REQUIRED)
-find_package(Arrow CONFIG REQUIRED)
-find_package(AdbcDriverManager CONFIG REQUIRED)
+
+# Try to find Arrow and ADBC from system packages first
+find_package(PkgConfig REQUIRED)
+
+# Find Arrow
+pkg_check_modules(ARROW arrow)
+if(ARROW_FOUND)
+    message(STATUS "Found Arrow via pkg-config: ${ARROW_LIBRARIES}")
+else()
+    # Fallback to find_package if pkg-config doesn't work
+    find_package(Arrow CONFIG REQUIRED)
+    if(Arrow_FOUND)
+        set(ARROW_LIBRARIES Arrow::arrow_static)
+        message(STATUS "Found Arrow via find_package")
+    endif()
+endif()
+
+# Find ADBC Driver Manager
+pkg_check_modules(ADBC_DRIVER_MANAGER adbc-driver-manager)
+if(ADBC_DRIVER_MANAGER_FOUND)
+    message(STATUS "Found ADBC Driver Manager via pkg-config: ${ADBC_DRIVER_MANAGER_LIBRARIES}")
+else()
+    # Fallback to find_package if pkg-config doesn't work
+    find_package(AdbcDriverManager CONFIG REQUIRED)
+    if(AdbcDriverManager_FOUND)
+        set(ADBC_DRIVER_MANAGER_LIBRARIES AdbcDriverManager::adbc_driver_manager_static)
+        message(STATUS "Found ADBC Driver Manager via find_package")
+    endif()
+endif()
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
@@ -58,17 +87,37 @@ endif()
 target_link_libraries(${EXTENSION_NAME} 
     OpenSSL::SSL 
     OpenSSL::Crypto
-    Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
+    ${ARROW_LIBRARIES}
+    ${ADBC_DRIVER_MANAGER_LIBRARIES}
     ${CMAKE_DL_LIBS}
 )
 target_link_libraries(${LOADABLE_EXTENSION_NAME} 
     OpenSSL::SSL 
     OpenSSL::Crypto
-    Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
+    ${ARROW_LIBRARIES}
+    ${ADBC_DRIVER_MANAGER_LIBRARIES}
     ${CMAKE_DL_LIBS}
 )
+
+# Add include directories
+if(ARROW_FOUND)
+    target_include_directories(${EXTENSION_NAME} PRIVATE ${ARROW_INCLUDE_DIRS})
+    target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${ARROW_INCLUDE_DIRS})
+    # Add link directories for pkg-config libraries
+    if(ARROW_LIBRARY_DIRS)
+        target_link_directories(${EXTENSION_NAME} PRIVATE ${ARROW_LIBRARY_DIRS})
+        target_link_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${ARROW_LIBRARY_DIRS})
+    endif()
+endif()
+if(ADBC_DRIVER_MANAGER_FOUND)
+    target_include_directories(${EXTENSION_NAME} PRIVATE ${ADBC_DRIVER_MANAGER_INCLUDE_DIRS})
+    target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${ADBC_DRIVER_MANAGER_INCLUDE_DIRS})
+    # Add link directories for pkg-config libraries
+    if(ADBC_DRIVER_MANAGER_LIBRARY_DIRS)
+        target_link_directories(${EXTENSION_NAME} PRIVATE ${ADBC_DRIVER_MANAGER_LIBRARY_DIRS})
+        target_link_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${ADBC_DRIVER_MANAGER_LIBRARY_DIRS})
+    endif()
+endif()
 
 # Link filesystem library if needed
 if(NOT APPLE)

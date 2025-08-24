@@ -18,8 +18,6 @@ jobs:
         # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ 'v1.3.1' ]
     env:
-      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-      VCPKG_TARGET_TRIPLET: 'x64-linux'
       GEN: ninja
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     defaults:
@@ -27,9 +25,15 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Ninja
+      - name: Install system dependencies
         shell: bash
-        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install -y -qq ninja-build pkg-config libssl-dev
+          # Install Arrow and ADBC from system packages
+          sudo apt-get install -y -qq libarrow-dev libarrow-python-dev
+          # For ADBC, we'll need to install from source or use a PPA
+          # For now, we'll build ADBC as part of the arrow-adbc submodule
 
       - uses: actions/checkout@v4
         with:
@@ -40,11 +44,6 @@ jobs:
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
-
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Rename extension
         if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
@@ -68,9 +67,6 @@ jobs:
         # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ 'v1.3.1']
     env:
-      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-      VCPKG_TARGET_TRIPLET: 'x64-osx'
-      OSX_BUILD_ARCH: 'x86_64'
       GEN: ninja
     defaults:
       run:
@@ -82,8 +78,12 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
-      - name: Install Ninja
-        run: brew install ninja
+      - name: Install system dependencies
+        run: |
+          brew install ninja pkg-config openssl
+          # Install Arrow from Homebrew
+          brew install apache-arrow
+          # ADBC will be built from the arrow-adbc submodule
 
       - uses: actions/setup-python@v2
         with:
@@ -93,11 +93,6 @@ jobs:
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
-
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Rename extension
         if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
@@ -120,9 +115,6 @@ jobs:
       matrix:
         # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ 'v1.3.1' ]
-    env:
-      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-      VCPKG_TARGET_TRIPLET: 'x64-windows-static-md'
     defaults:
       run:
         shell: bash
@@ -137,15 +129,20 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install system dependencies
+        run: |
+          # On Windows, we'll use vcpkg for now as it's more reliable
+          # But we'll install it manually without the action
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+          ./vcpkg install arrow adbc-driver-manager
+          cd ..
+
       - name: Checkout DuckDB to version
         run: |
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
-
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11.1
-        with:
-          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Rename extension
         if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'duckdb/extension-template' }}
