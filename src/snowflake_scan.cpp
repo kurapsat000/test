@@ -18,21 +18,33 @@ namespace snowflake {
 static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableFunctionBindInput &input,
                                                   vector<LogicalType> &return_types, vector<string> &names) {
 	DPRINT("SnowflakeScanBind invoked\n");
-	// Validate parameters
-	if (input.inputs.size() < 2) {
-		throw BinderException("snowflake_scan requires at least 2 parameters: query and profile");
-	}
 
-	// Get query and profile
-	auto query = input.inputs[0].GetValue<string>();
-	auto profile = input.inputs[1].GetValue<string>();
-
-	// Get config from profile
 	SnowflakeConfig config;
-	try {
-		config = SnowflakeSecretsHelper::GetCredentials(context, profile);
-	} catch (const std::exception &e) {
-		throw BinderException("Failed to retrieve credentials for profile '%s': %s", profile.c_str(), e.what());
+	string query;
+
+	// Handle different parameter patterns
+	if (input.inputs.size() == 2) {
+		// Pattern 1: snowflake_scan(connection_string, query)
+		// Pattern 2: snowflake_scan(query, profile)
+		auto param1 = input.inputs[0].GetValue<string>();
+		auto param2 = input.inputs[1].GetValue<string>();
+
+		// Check if param1 looks like a connection string (contains 'account=' or 'user=')
+		if (param1.find("account=") != string::npos || param1.find("user=") != string::npos) {
+			// Pattern 1: (connection_string, query)
+			config = SnowflakeConfig::ParseConnectionString(param1);
+			query = param2;
+		} else {
+			// Pattern 2: (query, profile)
+			query = param1;
+			try {
+				config = SnowflakeSecretsHelper::GetCredentials(context, param2);
+			} catch (const std::exception &e) {
+				throw BinderException("Failed to retrieve credentials for profile '%s': %s", param2.c_str(), e.what());
+			}
+		}
+	} else {
+		throw BinderException("snowflake_scan requires exactly 2 parameters: (connection_string, query) or (query, profile)");
 	}
 
 	// Get client manager
@@ -42,8 +54,7 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 	try {
 		connection = client_manager.GetConnection(config);
 	} catch (const std::exception &e) {
-		throw BinderException("Unexpected error connecting to Snowflake with profile '%s': %s", profile.c_str(),
-		                      e.what());
+		throw BinderException("Failed to initialize connection: %s", e.what());
 	}
 
 	// Create the factory that will manage the ADBC connection and statement
@@ -77,7 +88,7 @@ TableFunction GetSnowflakeScanFunction() {
 	// Create a table function that uses DuckDB's native Arrow scan implementation
 	// We only provide our own bind function to set up the Snowflake connection
 	// All other operations (init_global, init_local, scan) use DuckDB's implementation
-	// Parameters: query (VARCHAR), profile (VARCHAR)
+	// Parameters: (connection_string, query) or (query, profile)
 	TableFunction snowflake_scan("snowflake_scan", {LogicalType::VARCHAR, LogicalType::VARCHAR},
 	                             ArrowTableFunction::ArrowScanFunction,   // Use DuckDB's scan
 	                             snowflake::SnowflakeScanBind,            // Our bind function
