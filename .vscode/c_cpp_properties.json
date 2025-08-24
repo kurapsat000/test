@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "compileCommands": "${workspaceFolder}/build/release/compile_commands.json",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "configurationProvider": "ms-vscode.cmake-tools",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/src/include",
+                "${workspaceFolder}/duckdb/src/include",
+                "${workspaceFolder}/duckdb/extension",
+                "${workspaceFolder}/scripts",
+                "${workspaceFolder}/build/release/vcpkg_installed/x64-linux/include",
+                "${workspaceFolder}/build/debug/vcpkg_installed/x64-linux/include",
+                "~/vcpkg/packages/arrow-adbc_x64-linux/include",
+                "${workspaceFolder}/arrow-adbc/c/include"
+            ]
+        }
+    ],
+    "version": 4
+}
