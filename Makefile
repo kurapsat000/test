@@ -23,3 +23,7 @@ build_adbc_go:
 
 release-snowflake: build_adbc release
 	@echo "Snowflake extension built with ADBC driver"
+
+# CI-friendly build that doesn't require ADBC
+release-ci: release
+	@echo "Snowflake extension built for CI (without ADBC)"
