@@ -1,5 +1,8 @@
 name: Build Snowflake Extension
-on: [push, pull_request]
+on: [push, pull_request, repository_dispatch]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' || github.sha }}
+  cancel-in-progress: true
 
 jobs:
   linux:
@@ -7,28 +10,26 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ 'v1.3.1' ]
     env:
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
       VCPKG_TARGET_TRIPLET: 'x64-linux'
       GEN: ninja
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     defaults:
       run:
         shell: bash
 
     steps:
       - name: Install Ninja
+        shell: bash
         run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build
 
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: 'true'
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
 
       - name: Checkout DuckDB to version
         run: |
@@ -39,10 +40,19 @@ jobs:
         run: |
           git submodule update --init --recursive arrow-adbc
 
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11.1
         with:
           vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
+
+      - name: Build Arrow ADBC Driver
+        run: |
+          make build-adbc-release
 
       - name: Build
         run: |
@@ -57,6 +67,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
+        # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ 'v1.3.1' ]
     env:
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
@@ -99,6 +110,10 @@ jobs:
         with:
           vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
+      - name: Build Arrow ADBC Driver
+        run: |
+          make build-adbc-release
+
       - name: Build
         run: |
           make release-snowflake
@@ -112,6 +127,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
+        # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ 'v1.3.1' ]
     env:
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
@@ -152,10 +168,55 @@ jobs:
         with:
           vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
+      - name: Build Arrow ADBC Driver
+        run: |
+          make build-adbc-release
+
       - name: Build
         run: |
           make release-snowflake
 
       - name: Test extension
         run: |
-          build/release/test/Release/unittest.exe 
+          build/release/test/Release/unittest.exe
+
+  wasm:
+    name: WASM
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        duckdb_version: [ 'v1.3.1' ]
+    env:
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      VCPKG_TARGET_TRIPLET: 'wasm32-emscripten'
+      GEN: ninja
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Install Ninja
+        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build
+
+      - name: Checkout DuckDB to version
+        run: |
+          cd duckdb
+          git checkout ${{ matrix.duckdb_version }}
+
+      - name: Initialize Arrow ADBC submodule
+        run: |
+          git submodule update --init --recursive arrow-adbc
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
+
+      - name: Build WASM
+        run: |
+          make wasm_threads 
