@@ -5,6 +5,9 @@ set(TARGET_NAME snowflake)
 project(${TARGET_NAME})
 include_directories(src/include)
 
+# Add Arrow ADBC include directory
+include_directories(arrow-adbc/c/include)
+
 # DuckDB's extension distribution supports vcpkg. As such, dependencies can be added in ./vcpkg.json and then
 # used in cmake with find_package. Feel free to remove or replace with other dependencies.
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
