@@ -16,6 +16,18 @@ jobs:
         with:
           submodules: true
 
+      - name: Install Build Tools (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build
+
+      - name: Install Build Tools (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install ninja
+
+      - name: Install Build Tools (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: microsoft/setup-msbuild@v1.3.1
+
       - name: Checkout DuckDB
         run: |
           cd duckdb
@@ -27,4 +39,9 @@ jobs:
           vcpkgGitCommitId: 5e5d0e1cd7785623065e77eff011afdeec1a3574
 
       - name: Build
+        env:
+          VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          VCPKG_TARGET_TRIPLET: ${{ matrix.os == 'ubuntu-latest' && 'x64-linux' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-windows-static-md' }}
+          VCPKG_MANIFEST_DIR: ${{ github.workspace }}
+          GEN: ${{ matrix.os == 'windows-latest' && '' || 'ninja' }}
         run: make release-snowflake 
