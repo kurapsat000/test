@@ -63,8 +63,8 @@ static void LoadInternal(DatabaseInstance &instance) {
 	SnowflakeExtension::InitializeADBC();
 }
 
-void SnowflakeExtension::Load(DuckDB &db) {
-	LoadInternal(*db.instance);
+void SnowflakeExtension::Load(ExtensionLoader &db) {
+	LoadInternal(*db.GetDatabase().instance);
 }
 
 std::string SnowflakeExtension::Name() {
