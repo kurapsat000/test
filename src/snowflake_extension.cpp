@@ -48,15 +48,23 @@ static void LoadInternal(ExtensionLoader &loader) {
 	auto validate_credentials_func = GetSnowflakeValidateCredentialsFunction();
 	loader.RegisterFunction(validate_credentials_func);
 
-	// Register snowflake_scan table function
+#ifdef ADBC_AVAILABLE
+	// Register snowflake_scan table function (only available when ADBC is available)
 	auto snowflake_scan_function = GetSnowflakeScanFunction();
 	loader.RegisterFunction(snowflake_scan_function);
 
-	// duckdb::snowflake::SnowflakeAttachFunction snowflake_attach_function;
-	// loader.RegisterFunction(snowflake_attach_function);
-
+	// Register storage extension (only available when ADBC is available)
 	auto &config = DBConfig::GetConfig(loader.GetDatabaseInstance());
 	config.storage_extensions["snowflake"] = make_uniq<snowflake::SnowflakeStorageExtension>();
+#else
+	// ADBC not available - register a placeholder function that throws an error
+	auto snowflake_scan_function =
+	    TableFunction("snowflake_scan", {}, [](ClientContext &context, TableFunctionInput &data, DataChunk &output) {
+		    throw NotImplementedException(
+		        "snowflake_scan is not available on this platform (ADBC driver not supported)");
+	    });
+	loader.RegisterFunction(snowflake_scan_function);
+#endif
 }
 
 void SnowflakeExtension::Load(ExtensionLoader &loader) {
