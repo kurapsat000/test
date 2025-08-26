@@ -5,7 +5,7 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/function/scalar_function.hpp"
-#include "duckdb/main/extension_util.hpp"
+#include "duckdb/main/extension/extension_loader.hpp"
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
 // OpenSSL linked through vcpkg
@@ -44,27 +44,27 @@ inline void SnowflakeADBCVersionScalarFun(DataChunk &args, ExpressionState &stat
 	});
 }
 
-static void LoadInternal(DatabaseInstance &instance) {
+static void LoadInternal(ExtensionLoader &loader) {
 	// Register a scalar function
 	auto snowflake_scalar_function = ScalarFunction("snowflake", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SnowflakeScalarFun);
-	ExtensionUtil::RegisterFunction(instance, snowflake_scalar_function);
+	loader.RegisterFunction(snowflake_scalar_function);
 
 	// Register another scalar function
 	auto snowflake_openssl_version_scalar_function = ScalarFunction("snowflake_openssl_version", {LogicalType::VARCHAR},
 	                                                            LogicalType::VARCHAR, SnowflakeOpenSSLVersionScalarFun);
-	ExtensionUtil::RegisterFunction(instance, snowflake_openssl_version_scalar_function);
+	loader.RegisterFunction(snowflake_openssl_version_scalar_function);
 
 	// Register ADBC version function
 	auto snowflake_adbc_version_scalar_function = ScalarFunction("snowflake_adbc_version", {LogicalType::VARCHAR},
 	                                                            LogicalType::VARCHAR, SnowflakeADBCVersionScalarFun);
-	ExtensionUtil::RegisterFunction(instance, snowflake_adbc_version_scalar_function);
+	loader.RegisterFunction(snowflake_adbc_version_scalar_function);
 
 	// Initialize ADBC if available
 	SnowflakeExtension::InitializeADBC();
 }
 
-void SnowflakeExtension::Load(DuckDB &db) {
-	LoadInternal(*db.instance);
+void SnowflakeExtension::Load(ExtensionLoader &loader) {
+	LoadInternal(loader);
 }
 
 std::string SnowflakeExtension::Name() {
@@ -114,9 +114,8 @@ std::string SnowflakeExtension::GetADBCVersion() {
 
 extern "C" {
 
-DUCKDB_EXTENSION_API void snowflake_init(duckdb::DatabaseInstance &db) {
-	duckdb::DuckDB db_wrapper(db);
-	db_wrapper.LoadExtension<duckdb::SnowflakeExtension>();
+DUCKDB_CPP_EXTENSION_ENTRY(snowflake, loader) {
+	duckdb::LoadInternal(loader);
 }
 
 DUCKDB_EXTENSION_API const char *snowflake_version() {
