@@ -52,6 +52,19 @@ release-snowflake: build-adbc-release release
 
 debug-snowflake: build-adbc-debug debug
 
+# Fallback targets that don't require Ninja (for CI environments)
+release-snowflake-make: build-adbc-release
+	$(MAKE) release GENERATOR="Unix Makefiles"
+
+debug-snowflake-make: build-adbc-debug
+	$(MAKE) debug GENERATOR="Unix Makefiles"
+
+# CI-friendly targets that work without Ninja
+ci-build: release-snowflake-make
+
+ci-test: ci-build
+	./build/release/duckdb -c "LOAD 'build/release/extension/snowflake/snowflake.duckdb_extension'; SELECT snowflake_version();"
+
 # Clean ADBC artifacts
 clean-adbc:
 	rm -rf ./arrow-adbc/c/build ./arrow-adbc/c/build-debug

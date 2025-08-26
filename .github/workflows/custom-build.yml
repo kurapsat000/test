@@ -1,0 +1,101 @@
+name: Custom Extension Build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git
+      
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          echo "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_PATH
+      
+      - name: Build extension
+        run: |
+          export VCPKG_TOOLCHAIN_PATH="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          make ci-build
+      
+      - name: Test extension
+        run: |
+          make ci-test
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          brew install cmake
+      
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          echo "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_PATH
+      
+      - name: Build extension
+        run: |
+          export VCPKG_TOOLCHAIN_PATH="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          make ci-build
+      
+      - name: Test extension
+        run: |
+          make ci-test
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          choco install cmake
+      
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.bat
+          echo "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_PATH
+      
+      - name: Build extension
+        run: |
+          $env:VCPKG_TOOLCHAIN_PATH="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          make ci-build
+      
+      - name: Test extension
+        run: |
+          ./build/release/duckdb.exe -c "LOAD 'build/release/extension/snowflake/snowflake.duckdb_extension'; SELECT snowflake_version();"
+
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Check formatting
+        run: |
+          python3 duckdb/scripts/format.py --all --check --directories src test 
