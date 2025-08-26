@@ -11,11 +11,11 @@ include_directories(src/include)
 find_package(OpenSSL REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
 
-# ADBC driver manager is not available on Windows, so make it optional
-if(WIN32)
+# ADBC driver manager is not available on Windows/WASM, so make it optional
+if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     find_package(AdbcDriverManager CONFIG)
     if(NOT AdbcDriverManager_FOUND)
-        message(WARNING "AdbcDriverManager not found on Windows - Snowflake functionality will be limited")
+        message(WARNING "AdbcDriverManager not found on ${CMAKE_SYSTEM_NAME} - Snowflake functionality will be limited")
         set(ADBC_AVAILABLE FALSE)
     else()
         set(ADBC_AVAILABLE TRUE)
