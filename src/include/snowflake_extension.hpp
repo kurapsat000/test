@@ -16,6 +16,6 @@ public:
 } // namespace duckdb
 
 extern "C" {
-DUCKDB_CPP_EXTENSION_ENTRY(snowflake, loader)
+DUCKDB_CPP_EXTENSION_ENTRY(snowflake, loader);
 DUCKDB_EXTENSION_API const char *snowflake_version();
 }

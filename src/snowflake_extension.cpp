@@ -29,7 +29,7 @@ inline void SnowflakeVersionScalarFun(DataChunk &args, ExpressionState &state, V
 
 static void LoadInternal(ExtensionLoader &loader) {
 	// Register the custom Snowflake secret type
-	RegisterSnowflakeSecretType(loader.GetDatabase());
+	RegisterSnowflakeSecretType(loader.GetDatabaseInstance());
 
 	// Register snowflake_version function
 	auto snowflake_version_function =
@@ -55,7 +55,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	// duckdb::snowflake::SnowflakeAttachFunction snowflake_attach_function;
 	// loader.RegisterFunction(snowflake_attach_function);
 
-	auto &config = DBConfig::GetConfig(loader.GetDatabase());
+	auto &config = DBConfig::GetConfig(loader.GetDatabaseInstance());
 	config.storage_extensions["snowflake"] = make_uniq<snowflake::SnowflakeStorageExtension>();
 }
 
