@@ -10,7 +10,10 @@ include_directories(src/include)
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
 find_package(OpenSSL REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
-find_package(AdbcDriverManager CONFIG REQUIRED)
+
+# ADBC will be built manually via Makefile and linked dynamically
+# This ensures full functionality works on all platforms
+set(ADBC_AVAILABLE TRUE)
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
@@ -55,18 +58,16 @@ endif()
 
 # Link dependencies in both the static library and the loadable extension
 # Note: Snowflake ADBC driver will be loaded dynamically to avoid symbol conflicts
-target_link_libraries(${EXTENSION_NAME} 
-    OpenSSL::SSL 
+target_link_libraries(${EXTENSION_NAME}
+    OpenSSL::SSL
     OpenSSL::Crypto
     Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
     ${CMAKE_DL_LIBS}
 )
-target_link_libraries(${LOADABLE_EXTENSION_NAME} 
-    OpenSSL::SSL 
+target_link_libraries(${LOADABLE_EXTENSION_NAME}
+    OpenSSL::SSL
     OpenSSL::Crypto
     Arrow::arrow_static
-    AdbcDriverManager::adbc_driver_manager_static
     ${CMAKE_DL_LIBS}
 )
 
@@ -79,12 +80,16 @@ endif()
 # No RPATH configuration needed - using dynamic path resolution in code
 
 # Define path to Snowflake ADBC shared library for dynamic loading
-target_compile_definitions(${EXTENSION_NAME} PRIVATE 
+target_compile_definitions(${EXTENSION_NAME} PRIVATE
     -DSNOWFLAKE_ADBC_LIB="${SNOWFLAKE_ADBC_LIB}"
 )
-target_compile_definitions(${LOADABLE_EXTENSION_NAME} PRIVATE 
+target_compile_definitions(${LOADABLE_EXTENSION_NAME} PRIVATE
     -DSNOWFLAKE_ADBC_LIB="${SNOWFLAKE_ADBC_LIB}"
 )
+
+# Add ADBC availability flag
+target_compile_definitions(${EXTENSION_NAME} PRIVATE -DADBC_AVAILABLE=1)
+target_compile_definitions(${LOADABLE_EXTENSION_NAME} PRIVATE -DADBC_AVAILABLE=1)
 
 install(
   TARGETS ${EXTENSION_NAME}
