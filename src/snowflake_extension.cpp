@@ -40,23 +40,25 @@ inline void SnowflakeOpenSSLVersionScalarFun(DataChunk &args, ExpressionState &s
 inline void SnowflakeADBCVersionScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &name_vector = args.data[0];
 	UnaryExecutor::Execute<string_t, string_t>(name_vector, result, args.size(), [&](string_t name) {
-		return StringVector::AddString(result, "Snowflake " + name.GetString() + " - " + SnowflakeExtension::GetADBCVersion());
+		return StringVector::AddString(result,
+		                               "Snowflake " + name.GetString() + " - " + SnowflakeExtension::GetADBCVersion());
 	});
 }
 
 static void LoadInternal(ExtensionLoader &loader) {
 	// Register a scalar function
-	auto snowflake_scalar_function = ScalarFunction("snowflake", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SnowflakeScalarFun);
+	auto snowflake_scalar_function =
+	    ScalarFunction("snowflake", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SnowflakeScalarFun);
 	loader.RegisterFunction(snowflake_scalar_function);
 
 	// Register another scalar function
-	auto snowflake_openssl_version_scalar_function = ScalarFunction("snowflake_openssl_version", {LogicalType::VARCHAR},
-	                                                            LogicalType::VARCHAR, SnowflakeOpenSSLVersionScalarFun);
+	auto snowflake_openssl_version_scalar_function = ScalarFunction(
+	    "snowflake_openssl_version", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SnowflakeOpenSSLVersionScalarFun);
 	loader.RegisterFunction(snowflake_openssl_version_scalar_function);
 
 	// Register ADBC version function
 	auto snowflake_adbc_version_scalar_function = ScalarFunction("snowflake_adbc_version", {LogicalType::VARCHAR},
-	                                                            LogicalType::VARCHAR, SnowflakeADBCVersionScalarFun);
+	                                                             LogicalType::VARCHAR, SnowflakeADBCVersionScalarFun);
 	loader.RegisterFunction(snowflake_adbc_version_scalar_function);
 
 	// Initialize ADBC if available
@@ -85,7 +87,7 @@ bool SnowflakeExtension::InitializeADBC() {
 	// Initialize ADBC driver manager
 	// This would typically involve loading the ADBC driver and setting up connections
 	// For now, we'll just check if the driver file exists
-	FILE* file = fopen(ADBC_DRIVER_PATH, "r");
+	FILE *file = fopen(ADBC_DRIVER_PATH, "r");
 	if (file) {
 		fclose(file);
 		return true;
@@ -99,7 +101,7 @@ bool SnowflakeExtension::InitializeADBC() {
 
 std::string SnowflakeExtension::GetADBCVersion() {
 #ifdef ADBC_AVAILABLE
-	FILE* file = fopen(ADBC_DRIVER_PATH, "r");
+	FILE *file = fopen(ADBC_DRIVER_PATH, "r");
 	if (file) {
 		fclose(file);
 		return "ADBC Available - Driver Found";
