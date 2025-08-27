@@ -1,6 +1,6 @@
 # Build Fixes for DuckDB Snowflake Extension
 
-This document outlines the fixes implemented for WASM build issues, Ninja build tool configuration, missing dependencies, and Python formatting tools across different operating systems.
+This document outlines the fixes implemented for WASM build issues, Ninja build tool configuration, missing dependencies, Python formatting tools, and Windows package compatibility across different operating systems.
 
 ## Issues Fixed
 
@@ -48,7 +48,7 @@ Could not find flex. Please install it via your package manager:
 
 - **Linux**: Added comprehensive package installation including `flex`, `bison`, `libssl-dev`, `zlib1g-dev`, etc.
 - **macOS**: Added `flex`, `bison`, `openssl`, `zlib`, and other required packages via `brew`
-- **Windows**: Added `winflexbison3` and other packages via `choco`
+- **Windows**: Simplified to only essential packages available in Chocolatey
 
 ### 4. Compiler Configuration Issues
 
@@ -95,6 +95,37 @@ E: Unable to locate package libtinfo5
 - Updated package lists to be compatible with Ubuntu 24.04
 - Used `libncursesw5-dev` instead for terminal handling
 
+### 7. Windows Chocolatey Package Issues
+
+**Problem**: Many packages don't exist in the Chocolatey repository:
+
+```
+Failures:
+ - gdbm - gdbm not installed. The package was not found with the source(s) listed.
+ - libffi - libffi not installed. The package was not found with the source(s) listed.
+ - ncurses - ncurses not installed. The package was not found with the source(s) listed.
+```
+
+**Solution**:
+
+- Simplified Windows package installation to only essential packages available in Chocolatey
+- Removed packages that don't exist in Chocolatey repository
+- Used only: `cmake`, `ninja`, `winflexbison3`
+
+### 8. CMake Toolchain Path Issues
+
+**Problem**: CMake couldn't find the toolchain file due to malformed path:
+
+```
+Could not find toolchain file: WD/vcpkg/scripts/buildsystems/vcpkg.cmake
+```
+
+**Solution**:
+
+- Added path verification steps to debug toolchain path issues
+- Ensured proper environment variable construction
+- Added debugging output to verify toolchain file existence
+
 ## Workflow Changes
 
 ### MainDistributionPipeline.yml
@@ -103,7 +134,8 @@ E: Unable to locate package libtinfo5
 2. **Added custom comprehensive build job** with all required dependencies
 3. **Added custom WASM build job** with proper toolchain setup
 4. **Added custom format check job** with proper Python setup
-5. **Implemented proper environment variable configuration** for all builds
+5. **Added toolchain path verification** for debugging
+6. **Implemented proper environment variable configuration** for all builds
 
 ### custom-build.yml
 
@@ -112,6 +144,7 @@ E: Unable to locate package libtinfo5
 3. **Improved environment variable handling** for build tools
 4. **Added compiler configuration** for all platforms
 5. **Added Python dependencies** for code formatting
+6. **Simplified Windows package installation** to avoid Chocolatey issues
 
 ## Build Configuration
 
@@ -192,7 +225,8 @@ brew install cmake ninja flex bison openssl zlib bzip2 readline sqlite3 wget cur
 ### Windows
 
 ```bash
-choco install cmake ninja winflexbison3 openssl zlib bzip2 readline sqlite3 wget curl libffi xz gdbm nss ncurses pkg-config
+# Simplified to only essential packages available in Chocolatey
+choco install cmake ninja winflexbison3
 ```
 
 ## WASM Build Process
@@ -202,8 +236,9 @@ The WASM build process now follows these steps:
 1. **Setup Emscripten** using `mymindstorm/setup-emsdk@v13`
 2. **Install build tools and dependencies** including Ninja, Make, flex, bison, and all required libraries
 3. **Setup vcpkg** with proper toolchain configuration
-4. **Configure CMake** with explicit generator and make program
-5. **Build using emcmake and emmake** wrappers
+4. **Verify toolchain path** to ensure proper file location
+5. **Configure CMake** with explicit generator and make program
+6. **Build using emcmake and emmake** wrappers
 
 ## Testing
 
@@ -222,6 +257,7 @@ To test the fixes:
 3. **Optimize build times** with better caching strategies
 4. **Automate dependency detection** to prevent missing package issues
 5. **Add more Python tools** for comprehensive code quality checks
+6. **Improve Windows package management** with alternative package managers
 
 ## Troubleshooting
 
@@ -234,6 +270,8 @@ To test the fixes:
 5. **Compiler not found**: Set CC and CXX environment variables explicitly
 6. **Python black not found**: Install black with `pip install "black>=24"`
 7. **Package not found**: Check Ubuntu version compatibility (e.g., `libtinfo5` not in Ubuntu 24.04)
+8. **Windows package not found**: Use only packages available in Chocolatey repository
+9. **Toolchain path issues**: Verify VCPKG_TOOLCHAIN_PATH environment variable
 
 ### Debug Commands
 
@@ -261,6 +299,13 @@ black --version
 
 # Check Ubuntu version
 lsb_release -a
+
+# Check toolchain path
+echo $VCPKG_TOOLCHAIN_PATH
+ls -la "$VCPKG_TOOLCHAIN_PATH"
+
+# Check Windows Chocolatey packages
+choco list --local-only
 ```
 
 ## References
@@ -272,3 +317,4 @@ lsb_release -a
 - [vcpkg Troubleshooting](https://learn.microsoft.com/vcpkg/troubleshoot/build-failures)
 - [Black Code Formatter](https://black.readthedocs.io/)
 - [Ubuntu 24.04 Package Changes](https://discourse.ubuntu.com/t/noble-numbat-24-04-lts-release-notes/38247)
+- [Chocolatey Package Repository](https://community.chocolatey.org/packages)

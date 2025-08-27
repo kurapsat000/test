@@ -99,6 +99,10 @@ jobs:
           which ninja
           ninja --version
           
+          # Verify toolchain path
+          echo "VCPKG_TOOLCHAIN_PATH: $VCPKG_TOOLCHAIN_PATH"
+          ls -la "$VCPKG_TOOLCHAIN_PATH"
+          
           # Build the extension
           make ci-build
       
@@ -178,6 +182,11 @@ jobs:
         run: |
           # Ensure emscripten environment is properly set up
           source $EMSDK/emsdk_env.sh
+          
+          # Verify toolchain path
+          echo "VCPKG_TOOLCHAIN_PATH: $VCPKG_TOOLCHAIN_PATH"
+          ls -la "$VCPKG_TOOLCHAIN_PATH"
+          
           # Build with explicit generator and make program
           emcmake cmake \
             -DDUCKDB_EXTENSION_CONFIGS=${{ github.workspace }}/extension_config.cmake \
@@ -217,7 +226,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: "3.9"
       
       - name: Install Python dependencies
         run: |
