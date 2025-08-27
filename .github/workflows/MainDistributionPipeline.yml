@@ -43,6 +43,27 @@ jobs:
       extension_name: snowflake
       format_checks: 'format;tidy'
 
+  # Robust fallback build job
+  robust-fallback-build:
+    name: Robust Fallback Build
+    runs-on: ubuntu-latest
+    if: failure() # Only run if previous jobs fail
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Run Robust Build Script
+        run: |
+          ./scripts/robust_build.sh
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: robust-build-artifacts
+          path: build/
+
   # Custom comprehensive build job with all dependencies
   custom-build-comprehensive:
     name: Custom Comprehensive Build
