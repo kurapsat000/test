@@ -15,7 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake git
+          sudo apt-get install -y build-essential cmake git ninja-build
       
       - name: Setup vcpkg
         run: |
@@ -24,8 +24,10 @@ jobs:
           echo "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_PATH
       
       - name: Build extension
+        env:
+          VCPKG_TOOLCHAIN_PATH: "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          GEN: "ninja"
         run: |
-          export VCPKG_TOOLCHAIN_PATH="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
           make ci-build
       
       - name: Test extension
@@ -41,7 +43,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          brew install cmake
+          brew install cmake ninja
       
       - name: Setup vcpkg
         run: |
@@ -50,8 +52,10 @@ jobs:
           echo "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_PATH
       
       - name: Build extension
+        env:
+          VCPKG_TOOLCHAIN_PATH: "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          GEN: "ninja"
         run: |
-          export VCPKG_TOOLCHAIN_PATH="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
           make ci-build
       
       - name: Test extension
@@ -67,7 +71,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          choco install cmake
+          choco install cmake ninja
       
       - name: Setup vcpkg
         run: |
@@ -76,13 +80,86 @@ jobs:
           echo "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_PATH
       
       - name: Build extension
+        env:
+          VCPKG_TOOLCHAIN_PATH: "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          GEN: "ninja"
         run: |
-          $env:VCPKG_TOOLCHAIN_PATH="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
           make ci-build
       
       - name: Test extension
         run: |
           ./build/release/duckdb.exe -c "LOAD 'build/release/extension/snowflake/snowflake.duckdb_extension'; SELECT snowflake_version();"
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        wasm_platform: [wasm_mvp, wasm_eh, wasm_threads]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v13
+        with:
+          version: 3.1.71
+      
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build make
+      
+      - name: Setup vcpkg
+        run: |
+          mkdir local_vcpkg_installation
+          cd local_vcpkg_installation
+          git init
+          git remote add origin https://github.com/Microsoft/vcpkg
+          git fetch origin main
+          git checkout main
+          ./bootstrap-vcpkg.sh
+          echo "VCPKG_ROOT=$PWD" >> $GITHUB_ENV
+          echo "VCPKG_TOOLCHAIN_PATH=$PWD/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_ENV
+          echo "$PWD" >> $GITHUB_PATH
+      
+      - name: Build WASM extension
+        env:
+          VCPKG_TARGET_TRIPLET: wasm32-emscripten
+          VCPKG_HOST_TRIPLET: x64-linux
+          VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/local_vcpkg_installation/scripts/buildsystems/vcpkg.cmake
+          DUCKDB_PLATFORM: ${{ matrix.wasm_platform }}
+          # Use Unix Makefiles for WASM builds to avoid generator issues
+          GEN: "Unix Makefiles"
+        run: |
+          # Ensure emscripten environment is properly set up
+          source $EMSDK/emsdk_env.sh
+          # Build with explicit generator and make program
+          emcmake cmake \
+            -DDUCKDB_EXTENSION_CONFIGS=${{ github.workspace }}/extension_config.cmake \
+            -DVCPKG_MANIFEST_DIR=${{ github.workspace }}/ \
+            -DWASM_LOADABLE_EXTENSIONS=1 \
+            -DBUILD_EXTENSIONS_ONLY=1 \
+            -DVCPKG_BUILD=1 \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/local_vcpkg_installation/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=wasm32-emscripten \
+            -DVCPKG_HOST_TRIPLET=x64-linux \
+            -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake \
+            -DEXTENSION_STATIC_BUILD=1 \
+            -DDUCKDB_EXPLICIT_PLATFORM=${{ matrix.wasm_platform }} \
+            -DDUCKDB_CUSTOM_PLATFORM=${{ matrix.wasm_platform }} \
+            -G "Unix Makefiles" \
+            -DCMAKE_MAKE_PROGRAM=make \
+            -Bbuild/${{ matrix.wasm_platform }} \
+            -S ./duckdb/
+          
+          emmake make -j$(nproc) -C build/${{ matrix.wasm_platform }}
+      
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snowflake-${{ matrix.wasm_platform }}-extension
+          path: build/${{ matrix.wasm_platform }}/extension/snowflake/snowflake.duckdb_extension.wasm
 
   format-check:
     runs-on: ubuntu-latest

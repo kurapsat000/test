@@ -65,6 +65,19 @@ ci-build: release-snowflake-make
 ci-test: ci-build
 	./build/release/duckdb -c "LOAD 'build/release/extension/snowflake/snowflake.duckdb_extension'; SELECT snowflake_version();"
 
+# WASM targets (ADBC not available in WASM, so we build without it)
+wasm_mvp_snowflake:
+	@echo "Building WASM MVP version without ADBC (limited functionality)"
+	$(MAKE) wasm_mvp
+
+wasm_eh_snowflake:
+	@echo "Building WASM EH version without ADBC (limited functionality)"
+	$(MAKE) wasm_eh
+
+wasm_threads_snowflake:
+	@echo "Building WASM Threads version without ADBC (limited functionality)"
+	$(MAKE) wasm_threads
+
 # Clean ADBC artifacts
 clean-adbc:
 	rm -rf ./arrow-adbc/c/build ./arrow-adbc/c/build-debug
