@@ -1,412 +1,207 @@
-# Permanent Build Fixes for DuckDB Snowflake Extension
+# Simplified Build Fixes for DuckDB Snowflake Extension
 
-This document outlines the comprehensive permanent fixes implemented to resolve all build issues across different platforms and environments.
+This document outlines the simplified approach to resolve build issues by using the standard DuckDB extension workflow instead of complex custom solutions.
 
 ## Issues Addressed
 
-### 1. Missing Dependencies in Docker Containers
+### 1. Complex Custom Build Solutions
 
-**Problem**: Docker containers used in CI/CD were missing essential build dependencies required by vcpkg packages like thrift.
+**Problem**: Previous attempts used complex custom Docker containers and build scripts that were difficult to maintain and debug.
 
-**Root Cause**: The Dockerfiles only installed dependencies conditionally or were missing comprehensive package lists.
+**Root Cause**: Over-engineering the build process instead of using the proven standard DuckDB extension workflow.
 
-**Permanent Solution**: Updated all Dockerfiles with comprehensive dependency installation.
+**Simplified Solution**: Use the standard DuckDB extension distribution workflow with minimal customizations.
 
-### 2. Build Tool Configuration Issues
+### 2. Dependency Management Complexity
 
-**Problem**: CMake couldn't find build tools (Ninja, Make) and compilers weren't properly configured.
+**Problem**: Manual dependency installation and complex package lists across different platforms.
 
-**Root Cause**: Environment variables weren't set consistently across different build environments.
+**Root Cause**: Trying to manage all dependencies manually instead of leveraging vcpkg's automatic dependency resolution.
 
-**Permanent Solution**: Added explicit environment variable configuration in Dockerfiles and build scripts.
+**Simplified Solution**: Let vcpkg handle dependency management automatically through the standard workflow.
 
-### 3. Platform-Specific Package Availability
+## Simplified Approach
 
-**Problem**: Different platforms (Ubuntu, Alpine, RHEL/CentOS) have different package names and availability.
+### 1. Standard Workflow Usage
 
-**Root Cause**: Build scripts assumed specific package names without platform detection.
+The extension now uses the standard DuckDB extension distribution workflow:
 
-**Permanent Solution**: Created platform-agnostic robust build script with automatic detection.
+```yaml
+# .github/workflows/MainDistributionPipeline.yml
+jobs:
+  duckdb-next-build:
+    name: Build extension binaries
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
+    with:
+      duckdb_version: main
+      ci_tools_version: main
+      extension_name: snowflake
+      extra_toolchains: "go"
+      exclude_archs: "wasm_mvp;wasm_eh;wasm_threads"
+```
 
-## Permanent Fixes Implemented
+### 2. Minimal vcpkg Configuration
 
-### 1. Updated Docker Containers
+The `vcpkg.json` file contains only essential dependencies:
 
-#### Linux AMD64 Dockerfile (`extension-ci-tools/docker/linux_amd64/Dockerfile`)
+```json
+{
+  "dependencies": ["openssl", "arrow"],
+  "vcpkg-configuration": {
+    "overlay-ports": ["./extension-ci-tools/vcpkg_ports"]
+  }
+}
+```
+
+### 3. Simplified Docker Containers
+
+Docker containers now only install essential build tools:
 
 ```dockerfile
-# Install essential build dependencies required by vcpkg packages
+# Install essential build dependencies
 RUN yum install -y \
     flex \
     bison \
-    libssl-devel \
-    zlib-devel \
-    bzip2-devel \
-    readline-devel \
-    sqlite-devel \
-    libffi-devel \
-    xz-devel \
-    gdbm-devel \
-    nss-devel \
-    ncurses-devel \
-    pkgconfig \
     gcc \
     gcc-c++ \
     make \
     cmake3 \
-    openssl-devel \
-    libcurl-devel \
-    expat-devel \
-    libxml2-devel \
-    libuuid-devel \
-    libtool \
-    automake \
-    gettext-devel \
-    python3-devel \
-    python3-pip \
-    boost-devel \
-    gmp-devel \
-    mpfr-devel \
-    mpc-devel \
-    isl-devel \
-    cloog-devel \
-    glibc-devel \
-    glibc-headers \
-    glibc-static \
-    libstdc++-devel \
-    libstdc++-static
-
-# Set explicit environment variables
-ENV GEN=ninja
-ENV CC=gcc
-ENV CXX=g++
-ENV CMAKE_MAKE_PROGRAM=ninja
+    pkgconfig
 ```
 
-#### Linux ARM64 Dockerfile (`extension-ci-tools/docker/linux_arm64/Dockerfile`)
+### 4. Simple Local Build Script
 
-- Same comprehensive dependency list as AMD64
-- ARM64-specific package compatibility
-- Explicit environment variable configuration
-
-#### Linux Musl Dockerfile (`extension-ci-tools/docker/linux_amd64_musl/Dockerfile`)
-
-```dockerfile
-# Install essential build dependencies required by vcpkg packages
-RUN apk add -qq \
-    flex \
-    bison \
-    libssl-dev \
-    zlib-dev \
-    bzip2-dev \
-    readline-dev \
-    sqlite-dev \
-    libffi-dev \
-    xz-dev \
-    gdbm-dev \
-    nss-dev \
-    ncurses-dev \
-    pkgconfig \
-    gcc \
-    g++ \
-    make \
-    cmake \
-    openssl-dev \
-    curl-dev \
-    expat-dev \
-    libxml2-dev \
-    util-linux-dev \
-    libtool \
-    automake \
-    gettext-dev \
-    python3-dev \
-    py3-pip \
-    boost-dev \
-    gmp-dev \
-    mpfr-dev \
-    mpc-dev \
-    isl-dev \
-    cloog-dev \
-    musl-dev \
-    libc-dev \
-    libstdc++-dev \
-    linux-headers \
-    pcre-dev \
-    libedit-dev \
-    libbsd-dev \
-    libexecinfo-dev \
-    libatomic \
-    libgomp \
-    libgcc \
-    libstdc++
-
-# Set explicit environment variables
-ENV GEN=ninja
-ENV CC=gcc
-ENV CXX=g++
-ENV CMAKE_MAKE_PROGRAM=ninja
-```
-
-### 2. Robust Build Script (`scripts/robust_build.sh`)
-
-A comprehensive build script that:
-
-- **Auto-detects platform**: Supports Ubuntu, RHEL/CentOS, Alpine, macOS
-- **Installs dependencies**: Platform-specific package installation
-- **Configures environment**: Sets up compilers, build tools, and vcpkg
-- **Verifies setup**: Checks all tools are available before building
-- **Provides fallback**: Graceful error handling and alternative approaches
-
-#### Key Features:
+For local development, use the simple build script:
 
 ```bash
-# Platform detection
-detect_system() {
-    # Detects apt, yum, dnf, apk, brew
-    # Sets appropriate install commands
-}
-
-# Dependency installation
-install_dependencies() {
-    # Platform-specific package lists
-    # Comprehensive coverage for all vcpkg requirements
-}
-
-# Environment configuration
-configure_build_env() {
-    # Sets CC, CXX, GEN, CMAKE_MAKE_PROGRAM
-    # Detects available compilers and build tools
-}
-
-# Build verification
-verify_build_tools() {
-    # Checks all required tools are available
-    # Validates vcpkg setup
-}
-```
-
-### 3. Enhanced Workflow Configuration
-
-#### Main Distribution Pipeline (`/.github/workflows/MainDistributionPipeline.yml`)
-
-- **Robust fallback build**: Runs when standard builds fail
-- **Comprehensive dependency installation**: All required packages
-- **Explicit environment configuration**: Clear variable settings
-- **Toolchain path verification**: Debugging and validation
-
-#### Custom Build Workflow (`/.github/workflows/custom-build.yml`)
-
-- **Platform-specific package installation**: Different package managers
-- **Simplified Windows packages**: Only essential Chocolatey packages
-- **Python dependency management**: Black formatter installation
-- **WASM build support**: Emscripten integration
-
-## Dependencies Covered
-
-### Essential Build Tools
-
-- **flex**: Required by thrift and other parser generators
-- **bison**: Required by thrift and other parser generators
-- **ninja**: Fast build system
-- **cmake**: Build system generator
-- **make**: Traditional build system (fallback)
-
-### Development Libraries
-
-- **libssl-dev**: SSL/TLS support
-- **zlib-dev**: Compression support
-- **libffi-dev**: Foreign function interface
-- **sqlite-dev**: Database support
-- **readline-dev**: Command line editing
-- **ncurses-dev**: Terminal handling
-- **boost-dev**: C++ libraries
-- **gmp-dev**: Arbitrary precision arithmetic
-
-### Compilers and Tools
-
-- **gcc/g++**: GNU C/C++ compiler
-- **clang/clang++**: LLVM C/C++ compiler (fallback)
-- **pkg-config**: Package configuration
-- **libtool**: Library building
-- **automake**: Makefile generation
-- **gettext**: Internationalization
-
-### Platform-Specific
-
-- **Ubuntu/Debian**: `-dev` packages
-- **RHEL/CentOS**: `-devel` packages
-- **Alpine**: `-dev` packages
-- **macOS**: Homebrew packages
-
-## Environment Variables Set
-
-```bash
-# Build system
-GEN=ninja                    # Use Ninja build system
-CMAKE_MAKE_PROGRAM=ninja     # CMake make program
-
-# Compilers
-CC=gcc                       # C compiler
-CXX=g++                      # C++ compiler
-
-# vcpkg
-VCPKG_ROOT=/path/to/vcpkg    # vcpkg installation
-VCPKG_TOOLCHAIN_PATH=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-# Platform-specific
-DUCKDB_PLATFORM=linux_amd64  # Target platform
-VCPKG_FORCE_SYSTEM_BINARIES=1  # Use system binaries (Alpine)
-```
-
-## Usage
-
-### Standard Build
-
-```bash
-# Use the robust build script
-./scripts/robust_build.sh
-```
-
-### Manual Build
-
-```bash
-# Set environment variables
+# scripts/simple_build.sh
+#!/bin/bash
 export GEN=ninja
-export CC=gcc
-export CXX=g++
-export CMAKE_MAKE_PROGRAM=ninja
-
-# Build with CMake
-cmake -B build -G "Ninja" -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg.cmake
-cmake --build build
+export DUCKDB_EXTENSIONS=snowflake
+make release
 ```
 
-### CI/CD Integration
-
-The workflows automatically:
-
-1. Install all required dependencies
-2. Configure build environment
-3. Verify tool availability
-4. Build with proper settings
-5. Fall back to robust build script if needed
-
-## Benefits
+## Key Benefits of Simplified Approach
 
 ### 1. Reliability
 
-- **Comprehensive dependency coverage**: All vcpkg requirements met
-- **Platform compatibility**: Works on all supported platforms
-- **Fallback mechanisms**: Multiple build strategies
-- **Error handling**: Graceful failure and recovery
+- **Proven workflow**: Uses the same workflow as all other DuckDB extensions
+- **Automatic dependency resolution**: vcpkg handles all dependencies automatically
+- **Standard tooling**: Leverages the same tools and processes as the main DuckDB project
 
-### 2. Performance
+### 2. Maintainability
 
-- **Fast builds**: Ninja build system
-- **Parallel compilation**: Multi-core utilization
-- **Caching**: ccache integration
-- **Optimized dependencies**: Platform-specific packages
+- **Minimal custom code**: Fewer custom scripts and configurations to maintain
+- **Standard practices**: Follows DuckDB extension development best practices
+- **Clear documentation**: Standard workflow is well-documented and understood
 
-### 3. Maintainability
+### 3. Compatibility
 
-- **Centralized configuration**: Single source of truth
-- **Documentation**: Clear setup instructions
-- **Testing**: Comprehensive verification
-- **Debugging**: Detailed logging and error messages
+- **Cross-platform**: Works on all platforms supported by DuckDB
+- **Version compatibility**: Automatically compatible with different DuckDB versions
+- **Tool compatibility**: Works with standard DuckDB development tools
 
-### 4. Compatibility
+### 4. Debugging
 
-- **Backward compatibility**: Existing workflows continue to work
-- **Forward compatibility**: Ready for future dependencies
-- **Cross-platform**: Consistent behavior across platforms
-- **Version independence**: Works with different tool versions
+- **Standard error messages**: Errors follow familiar patterns
+- **Community support**: Issues can be resolved using standard DuckDB extension knowledge
+- **Clear logs**: Standard workflow provides clear, actionable error messages
+
+## Usage
+
+### CI/CD Builds
+
+The extension automatically builds using the standard workflow on:
+
+- Push to main branch
+- Pull requests
+- Manual workflow dispatch
+
+### Local Development
+
+```bash
+# Simple build
+./scripts/simple_build.sh
+
+# Or use standard DuckDB extension commands
+export GEN=ninja
+export DUCKDB_EXTENSIONS=snowflake
+make release
+```
+
+### Testing
+
+```bash
+# Run tests
+make test_release
+```
+
+## Dependencies
+
+The extension requires minimal dependencies that are automatically managed:
+
+### Runtime Dependencies
+
+- **OpenSSL**: For secure connections to Snowflake
+- **Arrow**: For efficient data transfer
+
+### Build Dependencies
+
+- **flex/bison**: For parser generation (handled by vcpkg)
+- **CMake**: Build system (provided by Docker containers)
+- **Ninja**: Build tool (provided by Docker containers)
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Missing flex/bison**:
+1. **Build fails with missing dependencies**:
 
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get install flex bison
+   - The standard workflow automatically installs all required dependencies
+   - Check that `vcpkg.json` contains the correct dependencies
 
-   # RHEL/CentOS
-   sudo yum install flex bison
+2. **Local build issues**:
 
-   # Alpine
-   sudo apk add flex bison
-   ```
+   - Use the simple build script: `./scripts/simple_build.sh`
+   - Ensure you have the standard DuckDB development environment
 
-2. **CMake generator issues**:
-
-   ```bash
-   # Check available generators
-   cmake --help
-
-   # Use specific generator
-   cmake -G "Ninja" -DCMAKE_MAKE_PROGRAM=ninja
-   ```
-
-3. **Compiler not found**:
-
-   ```bash
-   # Check available compilers
-   which gcc g++ clang clang++
-
-   # Set explicitly
-   export CC=gcc
-   export CXX=g++
-   ```
-
-4. **vcpkg issues**:
-
-   ```bash
-   # Verify vcpkg installation
-   ls -la $VCPKG_TOOLCHAIN_PATH
-
-   # Reinstall if needed
-   git clone https://github.com/Microsoft/vcpkg.git
-   cd vcpkg && ./bootstrap-vcpkg.sh
-   ```
+3. **CI/CD failures**:
+   - Check the standard DuckDB extension workflow logs
+   - Issues are typically related to DuckDB version compatibility
 
 ### Debug Commands
 
 ```bash
-# Check system information
-uname -a
-lsb_release -a
-
-# Check package manager
-which apt-get yum dnf apk brew
+# Check environment
+echo "GEN: $GEN"
+echo "DUCKDB_EXTENSIONS: $DUCKDB_EXTENSIONS"
 
 # Check build tools
-which cmake ninja make gcc g++
-
-# Check environment
-echo "CC: $CC"
-echo "CXX: $CXX"
-echo "GEN: $GEN"
-echo "CMAKE_MAKE_PROGRAM: $CMAKE_MAKE_PROGRAM"
+which cmake ninja make
 
 # Check vcpkg
-echo "VCPKG_ROOT: $VCPKG_ROOT"
-echo "VCPKG_TOOLCHAIN_PATH: $VCPKG_TOOLCHAIN_PATH"
-ls -la "$VCPKG_TOOLCHAIN_PATH"
+ls -la vcpkg.json
 ```
+
+## Migration from Complex Approach
+
+If you were using the previous complex build approach:
+
+1. **Remove custom build scripts**: Delete `scripts/robust_build.sh`
+2. **Use standard workflow**: The simplified workflow is already in place
+3. **Update local development**: Use `scripts/simple_build.sh` for local builds
+4. **Remove custom dependencies**: Let vcpkg handle dependency management
 
 ## Future Improvements
 
-1. **Automated dependency detection**: Scan for missing packages
-2. **Build optimization**: Profile and optimize build times
-3. **Cross-compilation**: Support for more target platforms
-4. **Container optimization**: Smaller, faster Docker images
-5. **CI/CD integration**: Better integration with GitHub Actions
+1. **Standard extension practices**: Follow all DuckDB extension development guidelines
+2. **Community contributions**: Use standard processes for accepting contributions
+3. **Documentation**: Maintain standard DuckDB extension documentation practices
+4. **Testing**: Use standard DuckDB extension testing practices
 
 ## References
 
+- [DuckDB Extension Development Guide](https://duckdb.org/docs/extensions/overview)
+- [DuckDB Extension Template](https://github.com/duckdb/extension-template)
+- [DuckDB Extension CI Tools](https://github.com/duckdb/extension-ci-tools)
 - [vcpkg Documentation](https://github.com/microsoft/vcpkg)
-- [CMake Documentation](https://cmake.org/documentation/)
-- [Ninja Build System](https://ninja-build.org/)
-- [Docker Best Practices](https://docs.docker.com/develop/dev-best-practices/)
-- [GitHub Actions](https://docs.github.com/en/actions)
