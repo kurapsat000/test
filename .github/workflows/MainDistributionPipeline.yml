@@ -22,8 +22,6 @@ jobs:
       extra_toolchains: 'go;parser_tools'
       # Exclude resource-intensive builds to reduce disk space usage
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_arm64;linux_arm64_gcc4'
-      # Minimize build artifacts
-      minimal_build: true
 
   duckdb-stable-build:
     name: Build extension binaries (stable)
@@ -35,8 +33,6 @@ jobs:
       extra_toolchains: 'go;parser_tools'
       # Exclude resource-intensive builds to reduce disk space usage
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;linux_arm64;linux_arm64_gcc4'
-      # Minimize build artifacts
-      minimal_build: true
 
   code-quality-check:
     name: Code Quality Check

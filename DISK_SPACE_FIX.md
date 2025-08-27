@@ -43,15 +43,7 @@ exclude_archs: "wasm_mvp;wasm_eh;wasm_threads;linux_arm64;linux_arm64_gcc4"
 - WASM builds need Emscripten SDK (~2-3 GB)
 - Each architecture needs separate vcpkg dependencies (~1-2 GB each)
 
-### 2. Minimize Build Artifacts
-
-Added `minimal_build: true` to reduce intermediate files:
-
-- Removes debug symbols from final artifacts
-- Cleans up temporary build files
-- Reduces Docker layer sizes
-
-### 3. Optimized vcpkg Dependencies
+### 2. Optimized vcpkg Dependencies
 
 Reduced Arrow features to essential only:
 
