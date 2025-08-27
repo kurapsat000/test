@@ -63,26 +63,75 @@ jobs:
         run: |
           choco install ninja cmake
 
-      - name: Setup vcpkg
+      - name: Setup vcpkg (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
           git clone https://github.com/Microsoft/vcpkg.git vcpkg
           cd vcpkg
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            ./bootstrap-vcpkg.bat
-          else
-            ./bootstrap-vcpkg.sh
-          fi
+          ./bootstrap-vcpkg.sh
           echo "VCPKG_ROOT=$PWD" >> $GITHUB_ENV
 
-      - name: Test essential dependencies (classic mode)
+      - name: Setup vcpkg (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git vcpkg
+          cd vcpkg
+          .\bootstrap-vcpkg.bat
+          echo "VCPKG_ROOT=$PWD" >> $env:GITHUB_ENV
+
+      - name: Test essential dependencies (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
           cd vcpkg
-          # Use classic mode to test individual dependencies
           ./vcpkg install protobuf:${{ matrix.triplet }} --classic
           ./vcpkg install grpc:${{ matrix.triplet }} --classic
           ./vcpkg install openssl:${{ matrix.triplet }} --classic
 
-      - name: Test CMake with essential dependencies
+      - name: Test essential dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd vcpkg
+          .\vcpkg install protobuf:${{ matrix.triplet }} --classic
+          .\vcpkg install grpc:${{ matrix.triplet }} --classic
+          .\vcpkg install openssl:${{ matrix.triplet }} --classic
+
+      - name: Test CMake with essential dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir -p build/test
+          cd build/test
+          
+          # Create a minimal test CMakeLists.txt
+          @"
+          cmake_minimum_required(VERSION 3.5)
+          project(TestDeps)
+          
+          # Test essential dependency resolution
+          find_package(Protobuf CONFIG REQUIRED)
+          find_package(gRPC CONFIG REQUIRED)
+          find_package(OpenSSL REQUIRED)
+          
+          message(STATUS "✅ Protobuf found: `${Protobuf_FOUND}")
+          message(STATUS "✅ gRPC found: `${gRPC_FOUND}")
+          message(STATUS "✅ OpenSSL found: `${OPENSSL_FOUND}")
+          
+          # Create a dummy target to test linking
+          add_executable(test_deps test.cpp)
+          target_link_libraries(test_deps 
+            protobuf::libprotobuf 
+            gRPC::grpc++
+            OpenSSL::SSL
+          )
+          "@ | Out-File -FilePath CMakeLists.txt -Encoding utf8
+          
+          # Create dummy source file
+          echo 'int main(){return 0;}' > test.cpp
+          
+          # Test CMake configuration
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" .
+
+      - name: Test CMake with essential dependencies (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
           mkdir -p build/test
           cd build/test
@@ -124,8 +173,13 @@ jobs:
           cd build/test
           cmake --build . --config Release
 
-      - name: Show disk usage
+      - name: Show disk usage (Unix)
+        if: matrix.os != 'windows-latest'
         run: df -h
+
+      - name: Show disk usage (Windows)
+        if: matrix.os == 'windows-latest'
+        run: Get-PSDrive
 
   test-manifest-mode:
     name: Test Manifest Mode (${{ matrix.os }})
