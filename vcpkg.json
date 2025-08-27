@@ -1,21 +1,8 @@
 {
 	"dependencies": [
-		{
-			"name": "arrow",
-			"features": ["flight"],
-			"platform": "!windows"
-		},
-		{
-			"name": "arrow",
-			"platform": "windows"
-		},
-		{
-			"name": "protobuf",
-			"platform": "!windows"
-		},
-		{
-			"name": "openssl"
-		}
+		"arrow",
+		"protobuf",
+		"openssl"
 	],
 	"vcpkg-configuration": {
 		"overlay-ports": [
