@@ -4,6 +4,8 @@
 			"name": "arrow",
 			"features": ["flight"]
 		},
+		"abseil",
+		"c-ares",
 		"grpc",
 		"protobuf",
 		"openssl"

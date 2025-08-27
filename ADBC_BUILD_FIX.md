@@ -30,18 +30,18 @@ but the target was not found.
    - `grpc`: gRPC framework
    - `protobuf`: Protocol Buffers
 
-4. **vcpkg Dependency Resolution**: While vcpkg should automatically install transitive dependencies, explicitly listing them ensures proper dependency resolution across all platforms.
+4. **CMake Dependency Resolution Order**: Arrow's CMake config expects its dependencies to be found before Arrow itself is found.
 
 ## The Complete Solution
 
-Updated `vcpkg.json` to include Arrow with features AND all required dependencies:
+### 1. Updated vcpkg.json Dependencies
 
 ```json
 {
   "dependencies": [
     {
       "name": "arrow",
-      "features": ["flight", "flightsql"]
+      "features": ["flight"]
     },
     "abseil",
     "c-ares",
@@ -55,16 +55,48 @@ Updated `vcpkg.json` to include Arrow with features AND all required dependencie
 }
 ```
 
+### 2. Fixed CMake Dependency Order
+
+Updated CMakeLists.txt to find Arrow dependencies before Arrow:
+
+```cmake
+# Find Arrow dependencies first to ensure proper linking
+find_package(Protobuf CONFIG REQUIRED)
+find_package(gRPC CONFIG REQUIRED)
+find_package(absl CONFIG REQUIRED)
+find_package(c-ares CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
+
+# Find Arrow after its dependencies are resolved
+find_package(Arrow CONFIG REQUIRED)
+```
+
+### 3. Explicit Dependency Linking
+
+Added explicit linking to ensure all dependencies are available:
+
+```cmake
+target_link_libraries(${EXTENSION_NAME}
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    Arrow::arrow_static
+    protobuf::libprotobuf
+    gRPC::grpc++
+    ${CMAKE_DL_LIBS}
+)
+```
+
 ## Why This Works
 
 - **`flight` feature**: Provides the ADBC headers (`arrow-adbc/adbc.h`)
-- **`flightsql` feature**: Provides FlightSQL ADBC functionality
 - **Explicit dependencies**: Ensures all transitive dependencies are properly resolved:
+  - `protobuf`: Protocol Buffers for Arrow Flight serialization
+  - `grpc`: Core gRPC framework for Arrow Flight RPC
   - `abseil`: Required by gRPC and Arrow Flight
   - `c-ares`: DNS resolution for network operations
-  - `grpc`: Core gRPC framework for Arrow Flight
-  - `protobuf`: Protocol serialization
   - `openssl`: SSL/TLS support
+- **Correct find_package order**: Ensures CMake can resolve all Arrow dependencies before configuring Arrow
+- **Explicit linking**: Prevents missing symbol errors by explicitly linking required libraries
 
 ## Build Error Resolution
 
@@ -74,7 +106,8 @@ This fix resolves these specific errors:
 - ✅ `protobuf::libprotobuf target was not found`
 - ✅ Missing gRPC targets
 - ✅ Missing Abseil targets
-- ✅ Cross-platform dependency resolution
+- ✅ CMake dependency resolution failures
+- ✅ Cross-platform dependency resolution issues
 
 ## Alternative Solutions Considered
 
@@ -90,3 +123,4 @@ This fix resolves these specific errors:
 - [Arrow Flight feature dependencies](https://vcpkg.io/en/package/arrow.html#features)
 - [DuckDB extension CI tools](https://github.com/duckdb/extension-ci-tools)
 - [Apache Arrow Flight documentation](https://arrow.apache.org/docs/format/Flight.html)
+- [CMake find_package documentation](https://cmake.org/cmake/help/latest/command/find_package.html)

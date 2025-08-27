@@ -8,7 +8,15 @@ include_directories(src/include)
 # DuckDB's extension distribution supports vcpkg. As such, dependencies can be added in ./vcpkg.json and then
 # used in cmake with find_package. Feel free to remove or replace with other dependencies.
 # Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
+
+# Find Arrow dependencies first to ensure proper linking
+find_package(Protobuf CONFIG REQUIRED)
+find_package(gRPC CONFIG REQUIRED)
+find_package(absl CONFIG REQUIRED)
+find_package(c-ares CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
+
+# Find Arrow after its dependencies are resolved
 find_package(Arrow CONFIG REQUIRED)
 
 # ADBC will be built manually via Makefile and linked dynamically
@@ -62,12 +70,16 @@ target_link_libraries(${EXTENSION_NAME}
     OpenSSL::SSL
     OpenSSL::Crypto
     Arrow::arrow_static
+    protobuf::libprotobuf
+    gRPC::grpc++
     ${CMAKE_DL_LIBS}
 )
 target_link_libraries(${LOADABLE_EXTENSION_NAME}
     OpenSSL::SSL
     OpenSSL::Crypto
     Arrow::arrow_static
+    protobuf::libprotobuf
+    gRPC::grpc++
     ${CMAKE_DL_LIBS}
 )
 
