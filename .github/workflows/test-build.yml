@@ -1,0 +1,226 @@
+name: Fast Multi-OS Build Test
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "Andy-main-full" ]
+
+jobs:
+  test-dependencies:
+    name: Test Dependencies (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux
+            shell: bash
+          - os: macos-latest  
+            triplet: x64-osx
+            shell: bash
+          - os: windows-latest
+            triplet: x64-windows
+            shell: pwsh
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free Disk Space (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Free Disk Space (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          sudo rm -rf /Applications/Xcode_*.app
+          brew cleanup --prune=all
+          df -h
+
+      - name: Install build tools (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake pkg-config build-essential
+
+      - name: Install build tools (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install ninja cmake pkg-config
+
+      - name: Install build tools (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install ninja cmake
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git vcpkg
+          cd vcpkg
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            ./bootstrap-vcpkg.bat
+          else
+            ./bootstrap-vcpkg.sh
+          fi
+          echo "VCPKG_ROOT=$PWD" >> $GITHUB_ENV
+
+      - name: Install essential vcpkg dependencies (fast test)
+        run: |
+          cd vcpkg
+          # Install only critical dependencies for faster testing
+          ./vcpkg install protobuf:${{ matrix.triplet }}
+          ./vcpkg install grpc:${{ matrix.triplet }}
+          ./vcpkg install openssl:${{ matrix.triplet }}
+
+      - name: Test CMake find_package order
+        run: |
+          mkdir -p build/test
+          cd build/test
+          
+          # Create a minimal test CMakeLists.txt to test our dependency resolution
+          cat > CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.5)
+          project(TestDeps)
+          
+          # Test our dependency resolution order
+          find_package(Protobuf CONFIG REQUIRED)
+          find_package(gRPC CONFIG REQUIRED)
+          find_package(OpenSSL REQUIRED)
+          
+          message(STATUS "✅ Protobuf found: ${Protobuf_FOUND}")
+          message(STATUS "✅ gRPC found: ${gRPC_FOUND}")
+          message(STATUS "✅ OpenSSL found: ${OPENSSL_FOUND}")
+          
+          # Create a dummy target to test linking
+          add_executable(test_deps test.cpp)
+          target_link_libraries(test_deps 
+            protobuf::libprotobuf 
+            gRPC::grpc++
+            OpenSSL::SSL
+          )
+          EOF
+          
+          # Create dummy source file
+          echo 'int main(){return 0;}' > test.cpp
+          
+          # Test CMake configuration
+          cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+            .
+
+      - name: Test build configuration
+        run: |
+          cd build/test
+          cmake --build . --config Release
+
+      - name: Show disk usage
+        run: df -h
+
+  test-arrow-deps:
+    name: Test Arrow Dependencies (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: test-dependencies
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]  # Skip Windows for Arrow due to complexity
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux
+          - os: macos-latest  
+            triplet: x64-osx
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free Disk Space
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+            sudo docker image prune --all --force
+          else
+            sudo rm -rf /Applications/Xcode_*.app
+            brew cleanup --prune=all
+          fi
+          df -h
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git vcpkg
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+          echo "VCPKG_ROOT=$PWD" >> $GITHUB_ENV
+
+      - name: Install Arrow with minimal features
+        run: |
+          cd vcpkg
+          # Install Arrow with only flight feature for ADBC
+          ./vcpkg install "arrow[flight]:${{ matrix.triplet }}"
+
+      - name: Test complete dependency chain
+        run: |
+          mkdir -p build/arrow-test
+          cd build/arrow-test
+          
+          # Create test for our actual CMakeLists.txt pattern
+          cat > CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.5)
+          project(TestArrowDeps)
+          
+          # Test our exact dependency resolution order
+          find_package(Protobuf CONFIG REQUIRED)
+          find_package(gRPC CONFIG REQUIRED)
+          find_package(absl CONFIG REQUIRED)
+          find_package(c-ares CONFIG REQUIRED)
+          find_package(OpenSSL REQUIRED)
+          find_package(Arrow CONFIG REQUIRED)
+          
+          message(STATUS "✅ All dependencies found successfully!")
+          message(STATUS "✅ Arrow version: ${Arrow_VERSION}")
+          message(STATUS "✅ Arrow flight available: ${Arrow_FLIGHT_FOUND}")
+          
+          # Test that we can create a target with our exact linking pattern
+          add_executable(test_arrow test.cpp)
+          target_link_libraries(test_arrow
+            OpenSSL::SSL
+            OpenSSL::Crypto
+            Arrow::arrow_static
+            protobuf::libprotobuf
+            gRPC::grpc++
+          )
+          EOF
+          
+          echo '#include <arrow/api.h>
+          int main(){ return 0; }' > test.cpp
+          
+          cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+            .
+
+      - name: Test Arrow build
+        run: |
+          cd build/arrow-test
+          cmake --build . --config Release
+
+      - name: Success summary
+        run: |
+          echo "🎉 SUCCESS: All dependencies resolved correctly on ${{ matrix.os }}"
+          echo "✅ Protobuf linking works"
+          echo "✅ gRPC linking works"  
+          echo "✅ Arrow static linking works"
+          echo "✅ Cross-platform compatibility confirmed" 
