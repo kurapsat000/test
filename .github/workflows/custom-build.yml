@@ -15,7 +15,32 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake git ninja-build
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            ninja-build \
+            flex \
+            bison \
+            libssl-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            wget \
+            curl \
+            libffi-dev \
+            liblzma-dev \
+            libgdbm-dev \
+            libnss3-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            libc6-dev \
+            libgcc-s1 \
+            gcc \
+            g++ \
+            make \
+            pkg-config
       
       - name: Setup vcpkg
         run: |
@@ -27,7 +52,15 @@ jobs:
         env:
           VCPKG_TOOLCHAIN_PATH: "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
           GEN: "ninja"
+          CC: "gcc"
+          CXX: "g++"
+          CMAKE_MAKE_PROGRAM: "ninja"
         run: |
+          # Ensure ninja is available
+          which ninja
+          ninja --version
+          
+          # Build the extension
           make ci-build
       
       - name: Test extension
@@ -43,7 +76,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          brew install cmake ninja
+          brew install cmake ninja flex bison openssl zlib bzip2 readline sqlite3 wget curl libffi xz gdbm nss ncurses pkg-config
       
       - name: Setup vcpkg
         run: |
@@ -55,7 +88,15 @@ jobs:
         env:
           VCPKG_TOOLCHAIN_PATH: "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
           GEN: "ninja"
+          CC: "clang"
+          CXX: "clang++"
+          CMAKE_MAKE_PROGRAM: "ninja"
         run: |
+          # Ensure ninja is available
+          which ninja
+          ninja --version
+          
+          # Build the extension
           make ci-build
       
       - name: Test extension
@@ -71,7 +112,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          choco install cmake ninja
+          choco install cmake ninja winflexbison3 openssl zlib bzip2 readline sqlite3 wget curl libffi xz gdbm nss ncurses pkg-config
       
       - name: Setup vcpkg
         run: |
@@ -83,7 +124,14 @@ jobs:
         env:
           VCPKG_TOOLCHAIN_PATH: "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
           GEN: "ninja"
+          CC: "cl"
+          CXX: "cl"
+          CMAKE_MAKE_PROGRAM: "ninja"
         run: |
+          # Ensure ninja is available
+          ninja --version
+          
+          # Build the extension
           make ci-build
       
       - name: Test extension
@@ -105,10 +153,35 @@ jobs:
         with:
           version: 3.1.71
       
-      - name: Install build tools
+      - name: Install build tools and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build make
+          sudo apt-get install -y \
+            ninja-build \
+            make \
+            flex \
+            bison \
+            build-essential \
+            cmake \
+            git \
+            libssl-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            wget \
+            curl \
+            libffi-dev \
+            liblzma-dev \
+            libgdbm-dev \
+            libnss3-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            libc6-dev \
+            libgcc-s1 \
+            gcc \
+            g++ \
+            pkg-config
       
       - name: Setup vcpkg
         run: |

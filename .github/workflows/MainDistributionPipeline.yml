@@ -43,6 +43,70 @@ jobs:
       extension_name: snowflake
       format_checks: 'format;tidy'
 
+  # Custom comprehensive build job with all dependencies
+  custom-build-comprehensive:
+    name: Custom Comprehensive Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install all required dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            ninja-build \
+            flex \
+            bison \
+            libssl-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            wget \
+            curl \
+            libffi-dev \
+            liblzma-dev \
+            libgdbm-dev \
+            libnss3-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            libc6-dev \
+            libgcc-s1 \
+            gcc \
+            g++ \
+            make \
+            pkg-config
+      
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          echo "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_PATH
+      
+      - name: Build extension with proper configuration
+        env:
+          VCPKG_TOOLCHAIN_PATH: "$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          GEN: "ninja"
+          CC: "gcc"
+          CXX: "g++"
+          CMAKE_MAKE_PROGRAM: "ninja"
+        run: |
+          # Ensure ninja is available
+          which ninja
+          ninja --version
+          
+          # Build the extension
+          make ci-build
+      
+      - name: Test extension
+        run: |
+          make ci-test
+
   # Custom WASM build job with proper toolchain setup
   wasm-build:
     name: Build WASM Extension
@@ -60,10 +124,17 @@ jobs:
         with:
           version: 3.1.71
       
-      - name: Install Ninja build tool
+      - name: Install build tools and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build
+          sudo apt-get install -y \
+            ninja-build \
+            make \
+            flex \
+            bison \
+            build-essential \
+            cmake \
+            git
       
       - name: Setup vcpkg
         run: |
