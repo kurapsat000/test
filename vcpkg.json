@@ -2,8 +2,12 @@
 	"dependencies": [
 		{
 			"name": "arrow",
-			"features": ["flight", "flightsql", "dataset", "json", "parquet", "csv", "filesystem"]
+			"features": ["flight", "flightsql"]
 		},
+		"abseil",
+		"c-ares",
+		"grpc",
+		"protobuf",
 		"openssl"
 	],
 	"vcpkg-configuration": {
