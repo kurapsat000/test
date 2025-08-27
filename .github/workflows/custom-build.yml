@@ -34,7 +34,6 @@ jobs:
             libgdbm-dev \
             libnss3-dev \
             libncursesw5-dev \
-            libtinfo5 \
             libc6-dev \
             libgcc-s1 \
             gcc \
@@ -176,7 +175,6 @@ jobs:
             libgdbm-dev \
             libnss3-dev \
             libncursesw5-dev \
-            libtinfo5 \
             libc6-dev \
             libgcc-s1 \
             gcc \
@@ -245,6 +243,10 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install "black>=24"
       
       - name: Check formatting
         run: |

@@ -74,7 +74,6 @@ jobs:
             libgdbm-dev \
             libnss3-dev \
             libncursesw5-dev \
-            libtinfo5 \
             libc6-dev \
             libgcc-s1 \
             gcc \
@@ -134,7 +133,24 @@ jobs:
             bison \
             build-essential \
             cmake \
-            git
+            git \
+            libssl-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            wget \
+            curl \
+            libffi-dev \
+            liblzma-dev \
+            libgdbm-dev \
+            libnss3-dev \
+            libncursesw5-dev \
+            libc6-dev \
+            libgcc-s1 \
+            gcc \
+            g++ \
+            pkg-config
       
       - name: Setup vcpkg
         run: |
@@ -188,3 +204,25 @@ jobs:
         with:
           name: snowflake-${{ matrix.wasm_platform }}-extension
           path: build/${{ matrix.wasm_platform }}/extension/snowflake/snowflake.duckdb_extension.wasm
+
+  # Custom format check job with proper Python setup
+  format-check:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install "black>=24"
+      
+      - name: Check formatting
+        run: |
+          python3 duckdb/scripts/format.py --all --check --directories src test

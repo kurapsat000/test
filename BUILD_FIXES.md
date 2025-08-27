@@ -1,6 +1,6 @@
 # Build Fixes for DuckDB Snowflake Extension
 
-This document outlines the fixes implemented for WASM build issues, Ninja build tool configuration, and missing dependencies across different operating systems.
+This document outlines the fixes implemented for WASM build issues, Ninja build tool configuration, missing dependencies, and Python formatting tools across different operating systems.
 
 ## Issues Fixed
 
@@ -67,6 +67,34 @@ CMake Error: CMAKE_CXX_COMPILER not set, after EnableLanguage
   - **Windows**: `CC: "cl"`, `CXX: "cl"`
 - Set `CMAKE_MAKE_PROGRAM: "ninja"` for proper build tool configuration
 
+### 5. Missing Python Dependencies
+
+**Problem**: Code formatting was failing due to missing Python packages:
+
+```
+you need to run `pip install "black>=24"` [Errno 2] No such file or directory: 'black'
+```
+
+**Solution**:
+
+- Added Python setup step with `actions/setup-python@v4`
+- Installed required Python packages: `pip install "black>=24"`
+- Added dedicated format check job with proper Python environment
+
+### 6. Ubuntu 24.04 Package Compatibility
+
+**Problem**: Some packages don't exist in Ubuntu 24.04 (Noble):
+
+```
+E: Unable to locate package libtinfo5
+```
+
+**Solution**:
+
+- Removed `libtinfo5` from package lists (not available in Ubuntu 24.04)
+- Updated package lists to be compatible with Ubuntu 24.04
+- Used `libncursesw5-dev` instead for terminal handling
+
 ## Workflow Changes
 
 ### MainDistributionPipeline.yml
@@ -74,7 +102,8 @@ CMake Error: CMAKE_CXX_COMPILER not set, after EnableLanguage
 1. **Excluded problematic WASM builds** from the main distribution pipeline temporarily
 2. **Added custom comprehensive build job** with all required dependencies
 3. **Added custom WASM build job** with proper toolchain setup
-4. **Implemented proper environment variable configuration** for all builds
+4. **Added custom format check job** with proper Python setup
+5. **Implemented proper environment variable configuration** for all builds
 
 ### custom-build.yml
 
@@ -82,6 +111,7 @@ CMake Error: CMAKE_CXX_COMPILER not set, after EnableLanguage
 2. **Fixed WASM build process** with explicit CMake configuration
 3. **Improved environment variable handling** for build tools
 4. **Added compiler configuration** for all platforms
+5. **Added Python dependencies** for code formatting
 
 ## Build Configuration
 
@@ -107,9 +137,23 @@ env:
   CMAKE_MAKE_PROGRAM: "make"
 ```
 
+### Python Format Check Configuration
+
+```yaml
+steps:
+  - name: Setup Python
+    uses: actions/setup-python@v4
+    with:
+      python-version: "3.9"
+
+  - name: Install Python dependencies
+    run: |
+      pip install "black>=24"
+```
+
 ## Platform-Specific Setup
 
-### Linux
+### Linux (Ubuntu 24.04)
 
 ```bash
 sudo apt-get install -y \
@@ -131,7 +175,6 @@ sudo apt-get install -y \
   libgdbm-dev \
   libnss3-dev \
   libncursesw5-dev \
-  libtinfo5 \
   libc6-dev \
   libgcc-s1 \
   gcc \
@@ -169,7 +212,8 @@ To test the fixes:
 1. **Standard builds**: Run the main distribution pipeline
 2. **Comprehensive builds**: Run the custom comprehensive build job
 3. **WASM builds**: Run the custom WASM build job
-4. **Cross-platform**: Verify builds work on Linux, macOS, and Windows
+4. **Format checks**: Run the custom format check job
+5. **Cross-platform**: Verify builds work on Linux, macOS, and Windows
 
 ## Future Improvements
 
@@ -177,6 +221,7 @@ To test the fixes:
 2. **Add more comprehensive testing** for WASM builds
 3. **Optimize build times** with better caching strategies
 4. **Automate dependency detection** to prevent missing package issues
+5. **Add more Python tools** for comprehensive code quality checks
 
 ## Troubleshooting
 
@@ -187,6 +232,8 @@ To test the fixes:
 3. **CMake generator issues**: Verify the generator is explicitly set for WASM builds
 4. **Missing flex/bison**: Ensure flex and bison are installed
 5. **Compiler not found**: Set CC and CXX environment variables explicitly
+6. **Python black not found**: Install black with `pip install "black>=24"`
+7. **Package not found**: Check Ubuntu version compatibility (e.g., `libtinfo5` not in Ubuntu 24.04)
 
 ### Debug Commands
 
@@ -207,6 +254,13 @@ bison --version
 # Check compiler availability
 gcc --version
 g++ --version
+
+# Check Python and black installation
+python3 --version
+black --version
+
+# Check Ubuntu version
+lsb_release -a
 ```
 
 ## References
@@ -216,3 +270,5 @@ g++ --version
 - [CMake Generators](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html)
 - [Ninja Build System](https://ninja-build.org/)
 - [vcpkg Troubleshooting](https://learn.microsoft.com/vcpkg/troubleshoot/build-failures)
+- [Black Code Formatter](https://black.readthedocs.io/)
+- [Ubuntu 24.04 Package Changes](https://discourse.ubuntu.com/t/noble-numbat-24-04-lts-release-notes/38247)
