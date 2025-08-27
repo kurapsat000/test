@@ -2,10 +2,8 @@
 	"dependencies": [
 		{
 			"name": "arrow",
-			"features": ["flight", "flightsql"]
+			"features": ["flight"]
 		},
-		"abseil",
-		"c-ares",
 		"grpc",
 		"protobuf",
 		"openssl"
