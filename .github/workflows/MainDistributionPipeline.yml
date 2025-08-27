@@ -19,7 +19,7 @@ jobs:
       duckdb_version: main
       ci_tools_version: main
       extension_name: snowflake
-      extra_toolchains: 'go'
+      extra_toolchains: 'go;parser_tools'
       # Exclude problematic WASM builds for now until upstream fixes are available
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads'
 
@@ -30,7 +30,7 @@ jobs:
       duckdb_version: b354bfeff4 # Specific commit with new API
       ci_tools_version: main
       extension_name: snowflake
-      extra_toolchains: 'go'
+      extra_toolchains: 'go;parser_tools'
       # Exclude problematic WASM builds for now until upstream fixes are available
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads'
 
