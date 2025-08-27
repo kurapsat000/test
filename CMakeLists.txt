@@ -11,9 +11,11 @@ include_directories(src/include)
 
 # Find Arrow dependencies first to ensure proper linking
 find_package(Protobuf CONFIG REQUIRED)
-find_package(gRPC CONFIG REQUIRED)
-find_package(absl CONFIG REQUIRED)
-find_package(c-ares CONFIG REQUIRED)
+if(NOT WIN32)
+    find_package(gRPC CONFIG REQUIRED)
+    find_package(absl CONFIG REQUIRED) 
+    find_package(c-ares CONFIG REQUIRED)
+endif()
 find_package(OpenSSL REQUIRED)
 
 # Find Arrow after its dependencies are resolved
@@ -71,17 +73,30 @@ target_link_libraries(${EXTENSION_NAME}
     OpenSSL::Crypto
     Arrow::arrow_static
     protobuf::libprotobuf
-    gRPC::grpc++
     ${CMAKE_DL_LIBS}
 )
+
+# Add complex dependencies only on Unix systems
+if(NOT WIN32)
+    target_link_libraries(${EXTENSION_NAME}
+        gRPC::grpc++
+    )
+endif()
+
 target_link_libraries(${LOADABLE_EXTENSION_NAME}
     OpenSSL::SSL
     OpenSSL::Crypto
     Arrow::arrow_static
     protobuf::libprotobuf
-    gRPC::grpc++
     ${CMAKE_DL_LIBS}
 )
+
+# Add complex dependencies only on Unix systems  
+if(NOT WIN32)
+    target_link_libraries(${LOADABLE_EXTENSION_NAME}
+        gRPC::grpc++
+    )
+endif()
 
 # Link filesystem library if needed
 if(NOT APPLE)
@@ -108,3 +123,4 @@ install(
   EXPORT "${DUCKDB_EXPORT_SET}"
   LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
   ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
+

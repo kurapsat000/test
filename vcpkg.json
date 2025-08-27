@@ -2,13 +2,20 @@
 	"dependencies": [
 		{
 			"name": "arrow",
-			"features": ["flight"]
+			"features": ["flight"],
+			"platform": "!windows"
 		},
-		"abseil",
-		"c-ares",
-		"grpc",
-		"protobuf",
-		"openssl"
+		{
+			"name": "arrow",
+			"platform": "windows"
+		},
+		{
+			"name": "protobuf",
+			"platform": "!windows"
+		},
+		{
+			"name": "openssl"
+		}
 	],
 	"vcpkg-configuration": {
 		"overlay-ports": [
