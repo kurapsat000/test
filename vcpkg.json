@@ -1,15 +1,14 @@
 {
-        "dependencies": [
-                "openssl",
-                "arrow",
-                {
-                        "name": "arrow-adbc",
-                        "features": ["snowflake"]
-                }
-        ],
-        "vcpkg-configuration": {
-                "overlay-ports": [
-                        "./extension-ci-tools/vcpkg_ports"
-                ]
-        }
+	"dependencies": [
+		"openssl",
+		{
+			"name": "arrow",
+			"default-features": false
+		}
+	],
+	"vcpkg-configuration": {
+		"overlay-ports": [
+			"./extension-ci-tools/vcpkg_ports"
+		]
+	}
 }
