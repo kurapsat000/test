@@ -42,7 +42,7 @@ void SnowflakeSecretsHelper::StoreCredentials(ClientContext &context, const std:
 
 	// Create the secret using the secret manager
 	auto secret = CreateSnowflakeSecret(context, input);
-	CatalogTransaction transaction(context);
+	CatalogTransaction transaction(Catalog::GetSystemCatalog(context), context);
 	SecretManager::Get(context).RegisterSecret(transaction, std::move(secret), OnCreateConflict::REPLACE_ON_CONFLICT,
 	                                           SecretPersistType::PERSISTENT);
 }

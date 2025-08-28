@@ -1,23 +1,36 @@
 #include "storage/snowflake_schema_entry.hpp"
+
 #include "storage/snowflake_table_set.hpp"
-#include "storage/snowflake_schema_entry.hpp"
 
 namespace duckdb {
 namespace snowflake {
 
-SnowflakeSchemaEntry::SnowflakeSchemaEntry(Catalog &catalog, const string &schema_name, CreateSchemaInfo &info, shared_ptr<SnowflakeClient> client)
+SnowflakeSchemaEntry::SnowflakeSchemaEntry(Catalog &catalog, const string &schema_name, CreateSchemaInfo &info,
+                                           shared_ptr<SnowflakeClient> client)
     : SchemaCatalogEntry(catalog, info), client(client) {
 	name = schema_name;
 	tables = make_uniq<SnowflakeTableSet>(*this, client, schema_name);
 }
 
-optional_ptr<CatalogEntry> SnowflakeSchemaEntry::LookupEntry(CatalogTransaction transaction,
-                                                             const EntryLookupInfo &lookup_info) {
-	if (!CatalogTypeIsSupported(lookup_info.GetCatalogType())) {
+optional_ptr<CatalogEntry> SnowflakeSchemaEntry::LookupEntry(CatalogTransaction transaction, const string &name,
+                                                             OnEntryNotFound if_not_found) {
+	if (!CatalogTypeIsSupported(CatalogType::TABLE_ENTRY)) {
 		return nullptr;
 	}
 
-	return tables->GetEntry(transaction.GetContext(), lookup_info.GetEntryName());
+	auto entry = tables->GetEntry(transaction.GetContext(), name);
+	if (!entry && if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
+		throw BinderException("Table with name \"%s\" not found", name);
+	}
+	return entry;
+}
+
+optional_ptr<CatalogEntry> SnowflakeSchemaEntry::GetEntry(CatalogTransaction transaction, CatalogType type,
+                                                          const string &name) {
+	if (!CatalogTypeIsSupported(type)) {
+		return nullptr;
+	}
+	return tables->GetEntry(transaction.GetContext(), name);
 }
 
 void SnowflakeSchemaEntry::Scan(CatalogType type, const std::function<void(CatalogEntry &)> &callback) {
@@ -26,7 +39,7 @@ void SnowflakeSchemaEntry::Scan(CatalogType type, const std::function<void(Catal
 
 void SnowflakeSchemaEntry::Scan(ClientContext &context, CatalogType type,
                                 const std::function<void(CatalogEntry &)> &callback) {
-	if (!CatalogTypeIsSupported(type)) {
+	if (!CatalogTypeIsSupported(CatalogType::TABLE_ENTRY)) {
 		return;
 	}
 

@@ -36,15 +36,23 @@ void SnowflakeCatalog::ScanSchemas(ClientContext &context, std::function<void(Sc
 }
 
 optional_ptr<SchemaCatalogEntry> SnowflakeCatalog::LookupSchema(CatalogTransaction transaction,
-                                                                const EntryLookupInfo &schema_lookup,
+                                                                const string &schema_name,
                                                                 OnEntryNotFound if_not_found) {
-	auto schema_name = schema_lookup.GetEntryName();
-
-	auto schema = LookupSchema(transaction, schema_name, OnEntryNotFound::RETURN_NULL);
-	if (!schema && if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
+	auto found_entry = schemas.GetEntry(transaction.GetContext(), schema_name);
+	if (!found_entry && if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
 		throw BinderException("Schema with name \"%s\" not found", schema_name);
 	}
-	return dynamic_cast<SchemaCatalogEntry *>(schema.get());
+	return dynamic_cast<SchemaCatalogEntry *>(found_entry.get());
+}
+
+optional_ptr<SchemaCatalogEntry> SnowflakeCatalog::GetSchema(CatalogTransaction transaction, const string &schema_name,
+                                                             OnEntryNotFound if_not_found,
+                                                             QueryErrorContext error_context) {
+	auto found_entry = schemas.GetEntry(transaction.GetContext(), schema_name);
+	if (!found_entry && if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
+		throw BinderException("Schema with name \"%s\" not found", schema_name);
+	}
+	return dynamic_cast<SchemaCatalogEntry *>(found_entry.get());
 }
 
 optional_ptr<CatalogEntry> SnowflakeCatalog::CreateSchema(CatalogTransaction transaction, CreateSchemaInfo &info) {
@@ -69,23 +77,29 @@ string SnowflakeCatalog::GetDBPath() {
 	return config.account + "." + config.database;
 }
 
-PhysicalOperator &SnowflakeCatalog::PlanCreateTableAs(ClientContext &context, PhysicalPlanGenerator &planner,
-                                                      LogicalCreateTable &op, PhysicalOperator &plan) {
+unique_ptr<PhysicalOperator> SnowflakeCatalog::PlanCreateTableAs(ClientContext &context, LogicalCreateTable &op,
+                                                                 unique_ptr<PhysicalOperator> plan) {
 	throw NotImplementedException("Snowflake catalog is read-only");
 }
 
-PhysicalOperator &SnowflakeCatalog::PlanInsert(ClientContext &context, PhysicalPlanGenerator &planner,
-                                               LogicalInsert &op, optional_ptr<PhysicalOperator> plan) {
+unique_ptr<PhysicalOperator> SnowflakeCatalog::PlanInsert(ClientContext &context, LogicalInsert &op,
+                                                          unique_ptr<PhysicalOperator> plan) {
 	throw NotImplementedException("Snowflake catalog is read-only");
 }
 
-PhysicalOperator &SnowflakeCatalog::PlanDelete(ClientContext &context, PhysicalPlanGenerator &planner,
-                                               LogicalDelete &op, PhysicalOperator &plan) {
+unique_ptr<PhysicalOperator> SnowflakeCatalog::PlanDelete(ClientContext &context, LogicalDelete &op,
+                                                          unique_ptr<PhysicalOperator> plan) {
 	throw NotImplementedException("Snowflake catalog is read-only");
 }
 
-PhysicalOperator &SnowflakeCatalog::PlanUpdate(ClientContext &context, PhysicalPlanGenerator &planner,
-                                               LogicalUpdate &op, PhysicalOperator &plan) {
+unique_ptr<PhysicalOperator> SnowflakeCatalog::PlanUpdate(ClientContext &context, LogicalUpdate &op,
+                                                          unique_ptr<PhysicalOperator> plan) {
+	throw NotImplementedException("Snowflake catalog is read-only");
+}
+
+unique_ptr<LogicalOperator> SnowflakeCatalog::BindCreateIndex(Binder &binder, CreateStatement &stmt,
+                                                              TableCatalogEntry &table,
+                                                              unique_ptr<LogicalOperator> plan) {
 	throw NotImplementedException("Snowflake catalog is read-only");
 }
 

@@ -25,7 +25,10 @@ public:
 	void ScanSchemas(ClientContext &context, std::function<void(SchemaCatalogEntry &)> callback) override;
 
 	optional_ptr<SchemaCatalogEntry> LookupSchema(CatalogTransaction transaction, const string &schema_name,
-	                                              OnEntryNotFound if_not_found) override;
+	                                              OnEntryNotFound if_not_found);
+	optional_ptr<SchemaCatalogEntry> GetSchema(CatalogTransaction transaction, const string &schema_name,
+	                                           OnEntryNotFound if_not_found,
+	                                           QueryErrorContext error_context = QueryErrorContext()) override;
 
 	CatalogLookupBehavior CatalogTypeLookupRule(CatalogType type) const override {
 		if (type == CatalogType::TABLE_ENTRY) {
@@ -53,6 +56,8 @@ public:
 	                                        unique_ptr<PhysicalOperator> plan) override;
 	unique_ptr<PhysicalOperator> PlanUpdate(ClientContext &context, LogicalUpdate &op,
 	                                        unique_ptr<PhysicalOperator> plan) override;
+	unique_ptr<LogicalOperator> BindCreateIndex(Binder &binder, CreateStatement &stmt, TableCatalogEntry &table,
+	                                            unique_ptr<LogicalOperator> plan) override;
 
 private:
 	shared_ptr<SnowflakeClient> client;
