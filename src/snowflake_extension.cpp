@@ -59,8 +59,8 @@ static void LoadInternal(DatabaseInstance &instance) {
 	config.storage_extensions["snowflake"] = make_uniq<snowflake::SnowflakeStorageExtension>();
 }
 
-void SnowflakeExtension::Load(DuckDB &db) {
-	LoadInternal(*db.instance);
+void SnowflakeExtension::Load(ExtensionLoader &loader) {
+	LoadInternal(loader.db);
 }
 std::string SnowflakeExtension::Name() {
 	return "snowflake";
