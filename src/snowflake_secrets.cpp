@@ -1,21 +1,23 @@
 #include "snowflake_secrets.hpp"
-#include "snowflake_secret_provider.hpp"
+
+#include "duckdb/common/exception.hpp"
+#include "duckdb/common/string_util.hpp"
+#include "duckdb/common/types/value.hpp"
+#include "duckdb/main/client_context.hpp"
+#include "duckdb/main/database.hpp"
+#include "duckdb/main/secret/secret.hpp"
+#include "duckdb/main/secret/secret_manager.hpp"
 #include "snowflake_client.hpp"
 #include "snowflake_client_manager.hpp"
 #include "snowflake_config.hpp"
-#include "duckdb/common/exception.hpp"
-#include "duckdb/common/string_util.hpp"
-#include "duckdb/main/client_context.hpp"
-#include "duckdb/main/database.hpp"
-#include "duckdb/main/secret/secret_manager.hpp"
-#include "duckdb/main/secret/secret.hpp"
-#include "duckdb/common/types/value.hpp"
+#include "snowflake_secret_provider.hpp"
+
 #include <arrow-adbc/adbc.h>
+#include <cstring>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
-#include <cstring>
 
 namespace duckdb {
 
@@ -29,19 +31,20 @@ void SnowflakeSecretsHelper::StoreCredentials(ClientContext &context, const std:
 	CreateSecretInput input;
 	input.type = "snowflake";
 	input.provider = "config";
+	input.storage_type = "persistent";
 	input.name = profile_name;
-	input.persist_type = SecretPersistType::PERSISTENT;
-
-	// Store all credentials as snowflake-specific fields
+	input.options["account"] = Value(account);
 	input.options["user"] = Value(username);
 	input.options["password"] = Value(password);
-	input.options["account"] = Value(account);
 	input.options["warehouse"] = Value(warehouse);
 	input.options["database"] = Value(database);
 	input.options["schema"] = Value(schema);
 
-	// Create the secret
-	SecretManager::Get(context).CreateSecret(context, input);
+	// Create the secret using the secret manager
+	auto secret = CreateSnowflakeSecret(context, input);
+	CatalogTransaction transaction(context);
+	SecretManager::Get(context).RegisterSecret(transaction, std::move(secret), OnCreateConflict::REPLACE_ON_CONFLICT,
+	                                           SecretPersistType::PERSISTENT);
 }
 
 // Retrieve Snowflake config from a secret
@@ -127,7 +130,6 @@ std::vector<std::string> SnowflakeSecretsHelper::ListProfiles(ClientContext &con
 	return profiles;
 }
 
-
 // Legacy implementation for backward compatibility
 std::string SnowflakeSecrets::StoreCredentials(const std::string &profile_name) {
 	// This is deprecated - users should use the new secrets manager approach
@@ -158,17 +160,17 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
 
 		// Use SnowflakeClientManager to validate
 		auto &client_manager = snowflake::SnowflakeClientManager::GetInstance();
-		
+
 		try {
 			// Try to get a connection - this will validate the credentials
 			auto connection = client_manager.GetConnection(config);
-			
+
 			// If we got here, connection succeeded - test with a simple query
 			AdbcStatement statement;
 			AdbcError error_obj;
 			std::memset(&error_obj, 0, sizeof(error_obj));
 			std::memset(&statement, 0, sizeof(statement));
-			
+
 			AdbcStatusCode status = AdbcStatementNew(connection->GetConnection(), &statement, &error_obj);
 			if (status != ADBC_STATUS_OK) {
 				if (error_obj.release) {
@@ -191,7 +193,7 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
 			std::memset(&stream, 0, sizeof(stream));
 			status = AdbcStatementExecuteQuery(&statement, &stream, nullptr, &error_obj);
 			bool success = (status == ADBC_STATUS_OK);
-			
+
 			// Clean up
 			if (stream.release) {
 				stream.release(&stream);
@@ -200,7 +202,7 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
 			if (error_obj.release) {
 				error_obj.release(&error_obj);
 			}
-			
+
 			return success;
 		} catch (const IOException &inner_e) {
 			// Connection failed - this is expected for invalid credentials
@@ -234,21 +236,21 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
 		config.warehouse = warehouse;
 		config.database = database;
 		// Note: schema is not stored in SnowflakeConfig
-		
+
 		// Use SnowflakeClientManager like scan does
 		auto &client_manager = snowflake::SnowflakeClientManager::GetInstance();
-		
+
 		try {
 			// Try to get a connection - this will validate the credentials
 			auto connection = client_manager.GetConnection(config);
-			
+
 			// If we got here, connection succeeded
 			// Test with a simple query to be sure
 			AdbcStatement statement;
 			AdbcError error_obj;
 			std::memset(&error_obj, 0, sizeof(error_obj));
 			std::memset(&statement, 0, sizeof(statement));
-			
+
 			AdbcStatusCode status = AdbcStatementNew(connection->GetConnection(), &statement, &error_obj);
 			if (status != ADBC_STATUS_OK) {
 				if (error_obj.release) {
@@ -272,7 +274,7 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
 			std::memset(&stream, 0, sizeof(stream));
 			status = AdbcStatementExecuteQuery(&statement, &stream, nullptr, &error_obj);
 			bool success = (status == ADBC_STATUS_OK);
-			
+
 			// Clean up
 			if (stream.release) {
 				stream.release(&stream);
@@ -281,7 +283,7 @@ bool SnowflakeSecretsHelper::ValidateCredentials(ClientContext &context, const s
 			if (error_obj.release) {
 				error_obj.release(&error_obj);
 			}
-			
+
 			return success;
 		} catch (const IOException &inner_e) {
 			// Connection failed - this is expected for invalid credentials

@@ -1,16 +1,18 @@
 #include "snowflake_scan.hpp"
+
 #include "duckdb.hpp"
-#include "duckdb/function/table_function.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
-#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "duckdb/function/table/arrow.hpp"
-#include "snowflake_client_manager.hpp"
+#include "duckdb/function/table_function.hpp"
+#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "snowflake_arrow_utils.hpp"
+#include "snowflake_client_manager.hpp"
 #include "snowflake_config.hpp"
-#include "snowflake_secrets.hpp"
-#include <arrow-adbc/adbc.h>
 #include "snowflake_debug.hpp"
+#include "snowflake_secrets.hpp"
+
+#include <arrow-adbc/adbc.h>
 
 namespace duckdb {
 namespace snowflake {
@@ -54,7 +56,7 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 	// This allows us to use DuckDB's native Arrow scan implementation
 	auto bind_data = make_uniq<SnowflakeScanBindData>(std::move(factory));
 	// TODO remove below line after implementing projection pushdown
-	bind_data->projection_pushdown_enabled = false;
+	// bind_data->projection_pushdown_enabled = false;
 
 	// Get the schema from Snowflake using ADBC's ExecuteSchema
 	// This executes the query with schema-only mode to get column information
@@ -63,8 +65,7 @@ static unique_ptr<FunctionData> SnowflakeScanBind(ClientContext &context, TableF
 
 	// Use DuckDB's Arrow integration to populate the table type information
 	// This converts Arrow schema to DuckDB types and handles all type mappings
-	ArrowTableFunction::PopulateArrowTableType(DBConfig::GetConfig(context), bind_data->arrow_table,
-	                                           bind_data->schema_root, names, return_types);
+	ArrowTableFunction::PopulateArrowTableType(bind_data->arrow_table, bind_data->schema_root, names, return_types);
 	bind_data->all_types = return_types;
 
 	DPRINT("SnowflakeScanBind returning bind data\n");

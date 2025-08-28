@@ -1,14 +1,14 @@
-#include "snowflake_debug.hpp"
 #include "storage/snowflake_catalog.hpp"
-#include "storage/snowflake_schema_entry.hpp"
+
 #include "duckdb/storage/database_size.hpp"
+#include "snowflake_debug.hpp"
+#include "storage/snowflake_schema_entry.hpp"
 
 namespace duckdb {
 namespace snowflake {
 
 SnowflakeCatalog::SnowflakeCatalog(AttachedDatabase &db_p, const SnowflakeConfig &config)
-    : Catalog(db_p), client(SnowflakeClientManager::GetInstance().GetConnection(config)),
-      schemas(*this, client) {
+    : Catalog(db_p), client(SnowflakeClientManager::GetInstance().GetConnection(config)), schemas(*this, client) {
 	DPRINT("SnowflakeCatalog constructor called\n");
 	if (!client || !client->IsConnected()) {
 		throw ConnectionException("Failed to connect to Snowflake");
@@ -40,11 +40,11 @@ optional_ptr<SchemaCatalogEntry> SnowflakeCatalog::LookupSchema(CatalogTransacti
                                                                 OnEntryNotFound if_not_found) {
 	auto schema_name = schema_lookup.GetEntryName();
 
-	auto found_entry = schemas.GetEntry(transaction.GetContext(), schema_name);
-	if (!found_entry && if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
+	auto schema = LookupSchema(transaction, schema_name, OnEntryNotFound::RETURN_NULL);
+	if (!schema && if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
 		throw BinderException("Schema with name \"%s\" not found", schema_name);
 	}
-	return dynamic_cast<SchemaCatalogEntry *>(found_entry.get());
+	return dynamic_cast<SchemaCatalogEntry *>(schema.get());
 }
 
 optional_ptr<CatalogEntry> SnowflakeCatalog::CreateSchema(CatalogTransaction transaction, CreateSchemaInfo &info) {
