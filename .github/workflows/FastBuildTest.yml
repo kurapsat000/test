@@ -5,13 +5,13 @@ on:
     branches: [ "working-from-summer2025" ]
 
 jobs:
-  quick-build-test:
-    name: Quick Build Test (${{ matrix.os }})
+  debug-build-test:
+    name: Debug Build Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest]
 
     steps:
       - name: Checkout code
@@ -26,32 +26,33 @@ jobs:
           sudo docker image prune --all --force
           df -h
 
-      - name: Free Disk Space (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          sudo rm -rf /Applications/Xcode_*.app
-          brew cleanup --prune=all
-          df -h
-
       - name: Install build tools (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build
 
-      - name: Install build tools (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Debug DuckDB version
         run: |
-          brew install cmake ninja
+          cd duckdb && git describe --tags && git log -1 --oneline
 
-      - name: Install build tools (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Debug build environment
         run: |
-          choco install cmake ninja
+          which cmake
+          cmake --version
+          which ninja
+          ninja --version
+          which gcc
+          gcc --version
 
-      - name: Build extension
+      - name: Build extension with debug info
         run: |
+          set -x
+          export VERBOSE=1
+          # Don't use GEN=ninja to match CI behavior
           make release
+        env:
+          VERBOSE: 1
 
       - name: Test extension loading
         run: |
