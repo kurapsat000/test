@@ -38,9 +38,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-ubuntu-${{ hashFiles('vcpkg.json') }}
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-ubuntu-
 
       - name: Build Extension Only
         run: |
@@ -59,7 +59,7 @@ jobs:
       extension_name: snowflake
       # Enable parallel builds and caching
       build_args: --parallel
-      cache_key: snowflake-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+      cache_key: snowflake-ubuntu-${{ hashFiles('vcpkg.json') }}
 
   # Code quality check - run in parallel with build
   code-quality-check:
@@ -85,9 +85,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-ubuntu-${{ hashFiles('vcpkg.json') }}
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-ubuntu-
 
       - name: Build for formatting check
         run: |
@@ -131,9 +131,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-ubuntu-${{ hashFiles('vcpkg.json') }}
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-ubuntu-
 
       - name: Build and Test
         run: |
