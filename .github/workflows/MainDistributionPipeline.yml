@@ -18,6 +18,7 @@ jobs:
   quick-build-check:
     name: Quick Build Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,13 +48,14 @@ jobs:
           mkdir -p build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
-          cmake --build . --target snowflake_extension --parallel
+          cmake --build . --target snowflake_extension --parallel 4
 
   # Full DuckDB build with extension
   duckdb-stable-build:
     name: Build extension binaries
     runs-on: ubuntu-latest
     needs: [quick-build-check]
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,7 +85,8 @@ jobs:
           mkdir -p build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
-          cmake --build . --parallel
+          # Use fewer parallel jobs to avoid resource exhaustion
+          cmake --build . --parallel 2
 
       - name: Package Extension
         run: |
@@ -102,6 +105,7 @@ jobs:
   code-quality-check:
     name: Code Quality Check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -131,7 +135,7 @@ jobs:
           mkdir -p build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
-          cmake --build . --target snowflake_extension --parallel
+          cmake --build . --target snowflake_extension --parallel 4
 
       - name: Check formatting
         run: |
@@ -148,6 +152,7 @@ jobs:
     name: Test Extension
     runs-on: ubuntu-latest
     needs: [quick-build-check]
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -177,7 +182,8 @@ jobs:
           mkdir -p build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
-          cmake --build . --parallel
+          # Use fewer parallel jobs to avoid resource exhaustion
+          cmake --build . --parallel 2
           # Run only extension-specific tests
           ./test/unittest "test/sql/snowflake*"
 
@@ -187,6 +193,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [duckdb-stable-build, code-quality-check, test-extension]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4

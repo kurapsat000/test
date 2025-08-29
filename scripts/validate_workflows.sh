@@ -64,6 +64,22 @@ if ! grep -r "actions/checkout" .github/workflows/ > /dev/null; then
     exit 1
 fi
 
+# Check for timeout configurations
+echo "⏱️  Checking timeout configurations..."
+if ! grep -r "timeout-minutes:" .github/workflows/ > /dev/null; then
+    echo "⚠️  Warning: No timeout configurations found"
+else
+    echo "✅ Timeout configurations found"
+fi
+
+# Check for parallel build optimizations
+echo "⚡ Checking build optimizations..."
+if ! grep -r "parallel [0-9]" .github/workflows/ > /dev/null; then
+    echo "⚠️  Warning: No parallel build limits found"
+else
+    echo "✅ Parallel build limits configured"
+fi
+
 echo "✅ All workflow validations passed!"
 echo "🚀 Workflows are ready for GitHub Actions"
 
@@ -83,6 +99,14 @@ fi
 # Check for caching
 if ! grep -r "actions/cache" .github/workflows/ > /dev/null; then
     echo "⚠️  Warning: No caching configured"
+fi
+
+# Check for resource management
+echo "💾 Checking resource management..."
+if grep -r "parallel [0-9]" .github/workflows/ | grep -v "parallel 2\|parallel 4" > /dev/null; then
+    echo "⚠️  Warning: Some builds may use too many parallel jobs"
+else
+    echo "✅ Parallel job limits are reasonable"
 fi
 
 echo "🎉 Validation complete!" 
