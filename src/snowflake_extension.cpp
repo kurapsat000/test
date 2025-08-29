@@ -45,7 +45,10 @@ inline void SnowflakeADBCVersionScalarFun(DataChunk &args, ExpressionState &stat
 	});
 }
 
-static void LoadInternal(ExtensionLoader &loader) {
+static void LoadInternal(DuckDB &db) {
+	// Get the extension loader from the database
+	auto &loader = db.GetExtensionLoader();
+
 	// Register a scalar function
 	auto snowflake_scalar_function =
 	    ScalarFunction("snowflake", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SnowflakeScalarFun);
@@ -65,8 +68,8 @@ static void LoadInternal(ExtensionLoader &loader) {
 	SnowflakeExtension::InitializeADBC();
 }
 
-void SnowflakeExtension::Load(ExtensionLoader &loader) {
-	LoadInternal(loader);
+void SnowflakeExtension::Load(DuckDB &db) {
+	LoadInternal(db);
 }
 
 std::string SnowflakeExtension::Name() {
