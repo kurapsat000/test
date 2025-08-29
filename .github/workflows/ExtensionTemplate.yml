@@ -39,9 +39,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-snowflake
+          key: vcpkg-ubuntu-snowflake
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-ubuntu-
 
       - name: Rename extension
         run: |
@@ -79,9 +79,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-snowflake
+          key: vcpkg-ubuntu-snowflake
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-ubuntu-
 
       - name: Rename extension
         run: |
@@ -125,9 +125,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-snowflake
+          key: vcpkg-windows-snowflake
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-windows-
 
       - name: Rename extension
         run: |
@@ -171,9 +171,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-snowflake
+          key: vcpkg-macos-snowflake
           restore-keys: |
-            vcpkg-${{ runner.os }}-
+            vcpkg-macos-
 
       - name: Rename extension
         run: |
