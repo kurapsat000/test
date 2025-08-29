@@ -4,32 +4,30 @@
 
 # Before we load the extension, this will fail
 statement error
-SELECT snowflake('Sam');
+SELECT snowflake_version();
 ----
-Catalog Error: Scalar Function with name snowflake does not exist!
+Catalog Error: Scalar Function with name snowflake_version does not exist!
 
 # Require statement will ensure this test is run with this extension loaded
 require snowflake
 
 # Confirm the extension works
 query I
-SELECT snowflake('Sam');
+SELECT snowflake_version();
 ----
-Snowflake Sam 🐥
+Snowflake Extension v0.1.0
 
-query I
-SELECT snowflake_openssl_version('Michael') ILIKE 'Snowflake Michael, my linked OpenSSL version is OpenSSL%';
+# Test that snowflake_scan exists and validates parameters
+statement error
+SELECT * FROM snowflake_scan('');
 ----
-true
+No function matches the given name and argument types 'snowflake_scan(VARCHAR)'
 
-# Test ADBC integration (basic functionality)
-query I
-SELECT snowflake('ADBC Test') LIKE '%ADBC%';
+# Test invalid connection string
+statement error  
+SELECT * FROM snowflake_scan('invalid', 'SELECT 1');
 ----
-true
+Failed to bind snowflake_scan: {"exception_type":"Invalid Input","exception_message":"Snowflake connection string missing required 'account' parameter"}
 
-# Test ADBC version function
-query I
-SELECT snowflake_adbc_version('Test') LIKE '%ADBC%';
-----
-true
+# More comprehensive tests would require actual Snowflake credentials
+# These would be added in a separate test file that's not committed to the repository
