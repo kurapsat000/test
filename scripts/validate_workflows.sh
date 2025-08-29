@@ -37,5 +37,52 @@ if grep -r "hashFiles" .github/workflows/; then
     exit 1
 fi
 
+# Check for vcpkg tag usage instead of SHA1
+if grep -r "vcpkgGitCommitId: '[0-9]\{4\}\.[0-9]\{2\}\.[0-9]\{2\}'" .github/workflows/; then
+    echo "❌ Found vcpkg tag usage instead of SHA1 hash"
+    exit 1
+fi
+
+# Check for proper vcpkg SHA1 format (40 hex digits)
+if ! grep -r "vcpkgGitCommitId: '[a-f0-9]\{40\}'" .github/workflows/ > /dev/null; then
+    echo "❌ vcpkgGitCommitId must be a 40-character SHA1 hash"
+    exit 1
+fi
+
+# Check for missing required fields
+echo "📝 Checking for required workflow fields..."
+
+# Check for proper job structure
+if ! grep -r "runs-on:" .github/workflows/ > /dev/null; then
+    echo "❌ Missing 'runs-on' field in jobs"
+    exit 1
+fi
+
+# Check for proper checkout actions
+if ! grep -r "actions/checkout" .github/workflows/ > /dev/null; then
+    echo "❌ Missing checkout action"
+    exit 1
+fi
+
 echo "✅ All workflow validations passed!"
-echo "🚀 Workflows are ready for GitHub Actions" 
+echo "🚀 Workflows are ready for GitHub Actions"
+
+# Additional checks for common issues
+echo "🔍 Additional checks..."
+
+# Check for proper CMake setup
+if ! grep -r "jwlawson/actions-setup-cmake" .github/workflows/ > /dev/null; then
+    echo "⚠️  Warning: CMake setup action not found"
+fi
+
+# Check for proper vcpkg setup
+if ! grep -r "lukka/run-vcpkg" .github/workflows/ > /dev/null; then
+    echo "⚠️  Warning: vcpkg setup action not found"
+fi
+
+# Check for caching
+if ! grep -r "actions/cache" .github/workflows/ > /dev/null; then
+    echo "⚠️  Warning: No caching configured"
+fi
+
+echo "🎉 Validation complete!" 

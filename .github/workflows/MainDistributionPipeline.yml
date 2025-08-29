@@ -32,7 +32,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: '2024.01.12'
+          vcpkgGitCommitId: '53bef8994c541b6561884a8395ea35715ece75db'
 
       - name: Cache vcpkg
         uses: actions/cache@v4
@@ -68,7 +68,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: '2024.01.12'
+          vcpkgGitCommitId: '53bef8994c541b6561884a8395ea35715ece75db'
 
       - name: Cache vcpkg
         uses: actions/cache@v4
@@ -116,7 +116,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: '2024.01.12'
+          vcpkgGitCommitId: '53bef8994c541b6561884a8395ea35715ece75db'
 
       - name: Cache vcpkg
         uses: actions/cache@v4
@@ -162,7 +162,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: '2024.01.12'
+          vcpkgGitCommitId: '53bef8994c541b6561884a8395ea35715ece75db'
 
       - name: Cache vcpkg
         uses: actions/cache@v4
