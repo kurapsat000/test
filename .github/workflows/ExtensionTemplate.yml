@@ -1,7 +1,8 @@
 #
-# This workflow calls the main distribution pipeline from DuckDB to build, test and (optionally) release the extension
+# NOTE: this workflow is for testing the extension template itself,
+#     this workflow will be removed when scripts/bootstrap-template.py is run
 #
-name: Main Distribution Pipeline
+name: Extension Template
 
 on:
   push:
@@ -42,6 +43,10 @@ jobs:
           restore-keys: |
             vcpkg-${{ runner.os }}-
 
+      - name: Rename extension
+        run: |
+          python scripts/bootstrap-template.py snowflake
+
       - name: Build Extension Only
         run: |
           mkdir -p build
@@ -49,66 +54,9 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
           cmake --build . --target snowflake_extension --parallel
 
-  # Full DuckDB build with extension
-  duckdb-stable-build:
-    name: Build extension binaries
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.3.1
-    with:
-      duckdb_version: v1.3.1
-      ci_tools_version: v1.3.1
-      extension_name: snowflake
-      # Enable parallel builds and caching
-      build_args: --parallel
-      cache_key: snowflake-${{ runner.os }}
-
-  # Code quality check - run in parallel with build
-  code-quality-check:
-    name: Code Quality Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@v1.14
-        with:
-          cmake-version: '3.28'
-
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: '2024.01.12'
-
-      - name: Cache vcpkg
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.VCPKG_ROOT }}/installed
-          key: vcpkg-${{ runner.os }}-snowflake
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
-
-      - name: Build for formatting check
-        run: |
-          mkdir -p build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
-          cmake --build . --target snowflake_extension --parallel
-
-      - name: Check formatting
-        run: |
-          cd build
-          cmake --build . --target format-check
-
-      - name: Run clang-tidy
-        run: |
-          cd build
-          cmake --build . --target tidy-check
-
-  # Test the extension
-  test-extension:
-    name: Test Extension
+  # Full build and test
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
     needs: [quick-build-check]
     steps:
@@ -135,33 +83,111 @@ jobs:
           restore-keys: |
             vcpkg-${{ runner.os }}-
 
-      - name: Build and Test
+      - name: Rename extension
+        run: |
+          python scripts/bootstrap-template.py snowflake
+
+      - name: Build
         run: |
           mkdir -p build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
           cmake --build . --parallel
+
+      - name: Test
+        run: |
+          cd build
           # Run only extension-specific tests
           ./test/unittest "test/sql/snowflake*"
 
-  # Upload extension to DuckDB extension repository
-  upload-extension:
-    name: Upload Extension
-    runs-on: ubuntu-latest
-    needs: [duckdb-stable-build, code-quality-check, test-extension]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  # Windows build
+  windows-build:
+    name: Windows Build
+    runs-on: windows-latest
+    needs: [quick-build-check]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Download Extension Binaries
-        uses: actions/download-artifact@v4
         with:
-          name: extension-binaries
-          path: extension-binaries
+          submodules: recursive
 
-      - name: Upload to DuckDB Extension Repository
-        uses: duckdb/extension-ci-tools/.github/workflows/_extension_upload.yml@v1.3.1
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v1.14
         with:
-          extension_name: snowflake
-          extension_binaries_path: extension-binaries
+          cmake-version: '3.28'
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: '2024.01.12'
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_ROOT }}/installed
+          key: vcpkg-${{ runner.os }}-snowflake
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Rename extension
+        run: |
+          python scripts/bootstrap-template.py snowflake
+
+      - name: Build
+        run: |
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
+          cmake --build . --config Release --parallel
+
+      - name: Test extension
+        run: |
+          cd build
+          # Run only extension-specific tests
+          ./test/Release/unittest.exe "test/sql/snowflake*"
+
+  # macOS build
+  macos-build:
+    name: macOS Build
+    runs-on: macos-latest
+    needs: [quick-build-check]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v1.14
+        with:
+          cmake-version: '3.28'
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: '2024.01.12'
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_ROOT }}/installed
+          key: vcpkg-${{ runner.os }}-snowflake
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Rename extension
+        run: |
+          python scripts/bootstrap-template.py snowflake
+
+      - name: Build
+        run: |
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DEXTENSION_STATIC_BUILD=1 -DDUCKDB_EXTENSION_CONFIGS=$GITHUB_WORKSPACE/extension_config.cmake -S ../duckdb/
+          cmake --build . --parallel
+
+      - name: Test extension
+        run: |
+          cd build
+          # Run only extension-specific tests
+          ./test/unittest "test/sql/snowflake*"
