@@ -1,77 +1,67 @@
+#include "duckdb/common/helper.hpp"
 #define DUCKDB_EXTENSION_MAIN
 
 #include "snowflake_extension.hpp"
+// #include "snowflake_attach.hpp"
+#include "storage/snowflake_storage.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/function/scalar_function.hpp"
-#include "duckdb/main/extension/extension_loader.hpp"
+#include "duckdb/main/extension_util.hpp"
+#include "duckdb/execution/expression_executor.hpp"
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
-
-// OpenSSL linked through vcpkg
-#include <openssl/opensslv.h>
-
-// ADBC headers (when available)
-#ifdef ADBC_AVAILABLE
-#include <adbc.h>
-#include <adbc/driver_manager.h>
-#endif
-
-// ADBC driver path
-#define ADBC_DRIVER_PATH "build/adbc/snowflake_driver.so"
+#include "duckdb/function/table_function.hpp"
+#include "snowflake_functions.hpp"
+#include "snowflake_secret_provider.hpp"
 
 namespace duckdb {
 
-inline void SnowflakeScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-	auto &name_vector = args.data[0];
-	UnaryExecutor::Execute<string_t, string_t>(name_vector, result, args.size(), [&](string_t name) {
-		return StringVector::AddString(result, "Snowflake " + name.GetString() + " 🐥");
-	});
+// Forward declarations
+TableFunction GetSnowflakeScanFunction();
+void RegisterSnowflakeSecretType(DatabaseInstance &instance);
+
+inline void SnowflakeVersionScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
+	result.SetVectorType(VectorType::CONSTANT_VECTOR);
+	auto val = Value("Snowflake Extension v0.1.0");
+	result.SetValue(0, val);
 }
 
-inline void SnowflakeOpenSSLVersionScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-	auto &name_vector = args.data[0];
-	UnaryExecutor::Execute<string_t, string_t>(name_vector, result, args.size(), [&](string_t name) {
-		return StringVector::AddString(result, "Snowflake " + name.GetString() + ", my linked OpenSSL version is " +
-		                                           OPENSSL_VERSION_TEXT);
-	});
-}
+static void LoadInternal(DatabaseInstance &instance) {
+	// Register the custom Snowflake secret type
+	RegisterSnowflakeSecretType(instance);
 
-inline void SnowflakeADBCVersionScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-	auto &name_vector = args.data[0];
-	UnaryExecutor::Execute<string_t, string_t>(name_vector, result, args.size(), [&](string_t name) {
-		return StringVector::AddString(result,
-		                               "Snowflake " + name.GetString() + " - " + SnowflakeExtension::GetADBCVersion());
-	});
-}
+	// Register snowflake_version function
+	auto snowflake_version_function =
+	    ScalarFunction("snowflake_version", {}, LogicalType::VARCHAR, SnowflakeVersionScalarFun);
+	ExtensionUtil::RegisterFunction(instance, snowflake_version_function);
 
-static void LoadInternal(DuckDB &db) {
-	// Get the extension loader from the database
-	auto &loader = db.GetExtensionLoader();
+	// Register the snowflake_store_credentials scalar function
+	auto store_credentials_func = GetSnowflakeStoreCredentialsFunction();
+	ExtensionUtil::RegisterFunction(instance, store_credentials_func);
 
-	// Register a scalar function
-	auto snowflake_scalar_function =
-	    ScalarFunction("snowflake", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SnowflakeScalarFun);
-	loader.RegisterFunction(snowflake_scalar_function);
+	// Register the snowflake_list_profiles function
+	auto list_profiles_func = GetSnowflakeListProfilesFunction();
+	ExtensionUtil::RegisterFunction(instance, list_profiles_func);
 
-	// Register another scalar function
-	auto snowflake_openssl_version_scalar_function = ScalarFunction(
-	    "snowflake_openssl_version", {LogicalType::VARCHAR}, LogicalType::VARCHAR, SnowflakeOpenSSLVersionScalarFun);
-	loader.RegisterFunction(snowflake_openssl_version_scalar_function);
+	// Register the snowflake_validate_credentials function
+	auto validate_credentials_func = GetSnowflakeValidateCredentialsFunction();
+	ExtensionUtil::RegisterFunction(instance, validate_credentials_func);
 
-	// Register ADBC version function
-	auto snowflake_adbc_version_scalar_function = ScalarFunction("snowflake_adbc_version", {LogicalType::VARCHAR},
-	                                                             LogicalType::VARCHAR, SnowflakeADBCVersionScalarFun);
-	loader.RegisterFunction(snowflake_adbc_version_scalar_function);
+	// Register snowflake_scan table function
+	auto snowflake_scan_function = GetSnowflakeScanFunction();
+	ExtensionUtil::RegisterFunction(instance, snowflake_scan_function);
 
-	// Initialize ADBC if available
-	SnowflakeExtension::InitializeADBC();
+	// duckdb::snowflake::SnowflakeAttachFunction snowflake_attach_function;
+	// ExtensionUtil::RegisterFunction(instance, snowflake_attach_function);
+
+	auto &config = DBConfig::GetConfig(instance);
+	config.storage_extensions["snowflake"] = make_uniq<snowflake::SnowflakeStorageExtension>();
 }
 
 void SnowflakeExtension::Load(DuckDB &db) {
-	LoadInternal(db);
+	LoadInternal(*db.instance);
 }
-
 std::string SnowflakeExtension::Name() {
 	return "snowflake";
 }
@@ -84,43 +74,13 @@ std::string SnowflakeExtension::Version() const {
 #endif
 }
 
-// ADBC integration implementation
-bool SnowflakeExtension::InitializeADBC() {
-#ifdef ADBC_AVAILABLE
-	// Initialize ADBC driver manager
-	// This would typically involve loading the ADBC driver and setting up connections
-	// For now, we'll just check if the driver file exists
-	FILE *file = fopen(ADBC_DRIVER_PATH, "r");
-	if (file) {
-		fclose(file);
-		return true;
-	}
-	return false;
-#else
-	// ADBC not available, but extension can still function with basic features
-	return false;
-#endif
-}
-
-std::string SnowflakeExtension::GetADBCVersion() {
-#ifdef ADBC_AVAILABLE
-	FILE *file = fopen(ADBC_DRIVER_PATH, "r");
-	if (file) {
-		fclose(file);
-		return "ADBC Available - Driver Found";
-	}
-	return "ADBC Available - Driver Not Found";
-#else
-	return "ADBC Not Available";
-#endif
-}
-
 } // namespace duckdb
 
 extern "C" {
 
-DUCKDB_CPP_EXTENSION_ENTRY(snowflake, loader) {
-	duckdb::LoadInternal(loader);
+DUCKDB_EXTENSION_API void snowflake_init(duckdb::DatabaseInstance &db) {
+	duckdb::DuckDB db_wrapper(db);
+	db_wrapper.LoadExtension<duckdb::SnowflakeExtension>();
 }
 
 DUCKDB_EXTENSION_API const char *snowflake_version() {
